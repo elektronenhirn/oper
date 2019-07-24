@@ -10,7 +10,7 @@ extern crate clap;
 use clap::{App, Arg};
 
 mod utils;
-use utils::{find_project_file};
+use utils::{find_project_file, find_repo_base_folder};
 
 fn main() -> Result<(), String> {
     let mut original_cwd = env::current_dir().expect("cwd not found");
@@ -48,9 +48,11 @@ fn main() -> Result<(), String> {
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = find_project_file()?;
+    let base_folder = find_repo_base_folder()?;
     let file = File::open(project_file)?;
     for line in BufReader::new(file).lines() {
-            println!("{}", line.expect("project.list read error"));
+            let git = base_folder.join(line.expect("project.list read error"));
+            println!("{:?}", git);
     }
     Ok(())
 }

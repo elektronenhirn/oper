@@ -1,9 +1,9 @@
-use std::io;
-use std::path::Path;
 use std::env;
 use std::error::Error;
 use std::fs::File;
+use std::io;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 #[macro_use]
 extern crate clap;
@@ -38,11 +38,10 @@ fn main() -> Result<(), String> {
         )
         .get_matches();
 
-    let days =
-        value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
+    let days = value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    do_main(days, cwd).or_else(|e| Err( String::from(e.description())))
+    do_main(days, cwd).or_else(|e| Err(String::from(e.description())))
 }
 
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
@@ -51,8 +50,8 @@ fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     let base_folder = find_repo_base_folder()?;
     let file = File::open(project_file)?;
     for line in BufReader::new(file).lines() {
-            let git = base_folder.join(line.expect("project.list read error"));
-            println!("{:?}", git);
+        let git = base_folder.join(line.expect("project.list read error"));
+        println!("{:?}", git);
     }
     Ok(())
 }

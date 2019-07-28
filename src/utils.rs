@@ -1,3 +1,5 @@
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use git2::Time;
 use std::env;
 use std::fs;
 use std::io;
@@ -43,4 +45,18 @@ pub fn find_repo_base_folder() -> Result<PathBuf, io::Error> {
         io::ErrorKind::Other,
         "no .repo folder found",
     ))
+}
+
+/// converts a git2 time datastructure into its
+/// rust-idiomatic equivalent
+pub fn as_datetime(git_time: &Time) -> DateTime<FixedOffset> {
+    let offset_in_secs = git_time.offset_minutes() * 60;
+    FixedOffset::east(offset_in_secs).timestamp(git_time.seconds(), 0)
+}
+
+/// converts a git2 time datastructure into its
+/// rust-idiomatic equivalent converted to the UTC
+/// timezone
+pub fn as_datetime_utc(git_time: &Time) -> DateTime<Utc> {
+    as_datetime(git_time).with_timezone(&Utc)
 }

@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::rc::Rc;
 
 #[macro_use]
 extern crate clap;
@@ -11,9 +12,11 @@ use clap::{App, Arg};
 
 mod utils;
 use utils::{find_project_file, find_repo_base_folder};
+mod model;
+use model::{MultiRepoHistory, Repo};
 
 fn main() -> Result<(), String> {
-    let mut original_cwd = env::current_dir().expect("cwd not found");
+    let original_cwd = env::current_dir().expect("cwd not found");
     let matches = App::new("oper")
         .version("0.1.0")
         .author("Florian Bramer <elektronenhirn@gmail.com>")
@@ -47,11 +50,20 @@ fn main() -> Result<(), String> {
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = find_project_file()?;
-    let base_folder = find_repo_base_folder()?;
-    let file = File::open(project_file)?;
-    for line in BufReader::new(file).lines() {
-        let git = base_folder.join(line.expect("project.list read error"));
-        println!("{:?}", git);
-    }
+    let project_file = File::open(project_file)?;
+    let history = create_history(project_file, days)?;
+    println!("{:?}", history);
     Ok(())
+}
+
+fn create_history(project_file: std::fs::File, days: usize) -> Result<MultiRepoHistory, io::Error> {
+    let mut repos = Vec::new();
+
+    let base_folder = find_repo_base_folder()?;
+    for project in BufReader::new(project_file).lines() {
+        let git_repo = base_folder.join(project.expect("project.list read error"));
+        repos.push(Rc::new(Repo::from(git_repo)));
+    }
+    MultiRepoHistory::from_last_days(repos, days)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))
 }

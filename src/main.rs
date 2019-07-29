@@ -1,3 +1,12 @@
+#[macro_use]
+extern crate clap;
+extern crate cursive;
+
+mod utils;
+mod model;
+mod ui;
+mod table_view;
+
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -5,14 +14,8 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::rc::Rc;
-
-#[macro_use]
-extern crate clap;
 use clap::{App, Arg};
-
-mod utils;
 use utils::{find_project_file, find_repo_base_folder};
-mod model;
 use model::{MultiRepoHistory, Repo};
 
 fn main() -> Result<(), String> {
@@ -52,7 +55,8 @@ fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     let project_file = find_project_file()?;
     let project_file = File::open(project_file)?;
     let history = create_history(project_file, days)?;
-    println!("{:?}", history);
+//    println!("{:?}", history);
+    ui::show(history);
     Ok(())
 }
 

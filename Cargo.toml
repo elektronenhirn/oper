@@ -10,8 +10,7 @@ readme = "README.md"
 repository = "https://github.com/elektronenhirn/oper.git"
 
 [dependencies]
-cursive = { version = "0.12", default-features = false }
-cursive_table_view = "0.10.0"
+cursive = { version = "0.12" }
 git2 = "0.9.1"
 clap = "2.33.0"
 chrono = "0.4.7"

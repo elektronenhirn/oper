@@ -4,12 +4,15 @@ use git2::{Commit, Repository, Time};
 use std::fmt;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::cmp;
 
 /// A history of commits across multiple
 /// repositories
 pub struct MultiRepoHistory {
     repos: Vec<Rc<Repo>>,
-    commits: Vec<Entry>,
+    pub commits: Vec<Entry>,
+    pub max_width_repo: usize,
+    pub max_width_committer: usize,
 }
 
 impl MultiRepoHistory {
@@ -29,8 +32,11 @@ impl MultiRepoHistory {
         pred: &Fn(&Commit) -> bool,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let mut commits = Vec::new();
+        let mut max_width_repo = 0;
+        let mut max_width_committer = 0;
 
         for repo in &repos {
+            max_width_repo = cmp::max(max_width_repo, repo.description.len());
             let git_repo = Repository::open(&repo.path)?;
             let mut revwalk = git_repo.revwalk()?;
             revwalk.set_sorting(git2::Sort::TIME);
@@ -41,11 +47,15 @@ impl MultiRepoHistory {
                 if !pred(&commit) {
                     continue;
                 }
-                commits.push(Entry::from(repo.clone(), &commit));
+                let entry = Entry::from(repo.clone(), &commit);
+                max_width_committer = cmp::max(max_width_committer, entry.committer.len());
+                commits.push(entry);
             }
         }
-        commits.sort_unstable_by_key(|entry| entry.timestamp);
-        Ok(MultiRepoHistory { repos, commits })
+        commits.sort_unstable_by(|a,b|{
+          a.timestamp.cmp(&b.timestamp).reverse()
+        });
+        Ok(MultiRepoHistory { repos, commits, max_width_repo, max_width_committer })
     }
 }
 
@@ -62,7 +72,7 @@ impl fmt::Debug for MultiRepoHistory {
 /// representation of a local git repository
 pub struct Repo {
     path: PathBuf,
-    description: String,
+    pub description: String,
 }
 
 impl Repo {
@@ -74,12 +84,13 @@ impl Repo {
 
 /// representation of a git commit associated
 /// with a local git repository
+#[derive(Clone)]
 pub struct Entry {
-    repo: Rc<Repo>,
-    timestamp: Time,
-    summary: String,
-    author: String,
-    committer: String,
+    pub repo: Rc<Repo>,
+    pub timestamp: Time,
+    pub summary: String,
+    pub author: String,
+    pub committer: String,
 }
 
 impl Entry {

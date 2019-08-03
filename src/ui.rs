@@ -1,19 +1,20 @@
+use crate::model::{Entry, MultiRepoHistory};
+use crate::table_view::{TableView, TableViewItem};
+use cursive::theme::{BaseColor, Color, ColorStyle};
+use cursive::traits::*;
+use cursive::views::{Canvas, LinearLayout};
+use cursive::Cursive;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::default::Default;
-
-use cursive::traits::*;
-use cursive::Cursive;
-use cursive::theme;
-use crate::model::{MultiRepoHistory, Entry};
-
-use crate::table_view::{TableView, TableViewItem};
+use std::rc::Rc;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum Column {
     CommitDateTime,
     Comitter,
     Repo,
-    Summary
+    Summary,
 }
 
 impl TableViewItem<Column> for Entry {
@@ -39,27 +40,85 @@ impl TableViewItem<Column> for Entry {
     }
 }
 
+fn build_commit_bar(model: Rc<RefCell<String>>) -> impl cursive::view::View {
+    Canvas::new(model)
+        .with_draw(|model, printer| {
+            let style =
+                ColorStyle::new(Color::Dark(BaseColor::White), Color::Dark(BaseColor::Blue));
+            printer.with_style(style, |p| {
+                let text = (*(*model).borrow()).clone();
+                p.print((0, 0), &text);
+                p.print_hline((text.len(), 0), p.size.x - text.len(), " ");
+            });
+        })
+        .with_required_size(|_model, req| cursive::Vec2::new(req.x, 1))
+}
+
+fn build_status_bar(model: Rc<String>) -> impl cursive::view::View {
+    Canvas::new(model)
+        .with_draw(|model, printer| {
+            printer.with_style(ColorStyle::tertiary(), |p| p.print((0, 0), &model))
+        })
+        .with_required_size(|_model, req| cursive::Vec2::new(req.x, 1))
+}
+
+fn update_commit_bar(
+    commit_bar_model: &Rc<RefCell<String>>,
+    index: usize,
+    size: usize,
+    entry: &Entry,
+) {
+    (*commit_bar_model).replace(format!(
+        "Commit {} of {} - {}",
+        index + 1,
+        size,
+        entry.repo.rel_path
+    ));
+}
+
 pub fn show(model: MultiRepoHistory) {
+    let commit_bar = Rc::new(RefCell::new(String::from("")));
+    let commit_bar_copy = commit_bar.clone();
+    let status_bar = Rc::new(format!(
+        "Found {} commits across {} repositories",
+        model.commits.len(),
+        model.repos.len()
+    ));
+    let commits = model.commits.len();
+    if commits > 0 {
+        update_commit_bar(&commit_bar, 0, commits, &model.commits[0]);
+    }
 
     let mut siv = Cursive::default();
     siv.load_toml(include_str!("../assets/style.toml")).unwrap();
 
     let mut table = TableView::<Entry, Column>::new()
         .column(Column::CommitDateTime, "Commit", |c| c.width(22))
-        .column(Column::Repo, "Repo", |c|  c.width(model.max_width_repo).color(theme::ColorStyle::secondary()))
-        .column(Column::Comitter, "Committer", |c| c.width(model.max_width_committer).color(theme::ColorStyle::tertiary()))
-        .column(Column::Summary, "Summary", |c| c.color(theme::ColorStyle::tertiary()));
-
+        .column(Column::Repo, "Repo", |c| {
+            c.width(model.max_width_repo).color(ColorStyle::secondary())
+        })
+        .column(Column::Comitter, "Committer", |c| {
+            c.width(model.max_width_committer)
+                .color(ColorStyle::tertiary())
+        })
+        .column(Column::Summary, "Summary", |c| {
+            c.color(ColorStyle::tertiary())
+        });
     table.set_items(model.commits);
-    table.set_on_submit(|siv: &mut Cursive, row: usize, index: usize| {
-        let value = siv
+    table.set_on_select(move |siv: &mut Cursive, _row: usize, index: usize| {
+        let entry = siv
             .call_on_id("table", move |table: &mut TableView<Entry, Column>| {
-                format!("{:?}", table.borrow_item(index).unwrap())
+                table.borrow_item(index).unwrap().clone()
             })
             .unwrap();
+        update_commit_bar(&commit_bar, index, commits, &entry);
     });
-
-    siv.add_fullscreen_layer(table.full_screen());
+    table.set_selected_row(0);
+    let layout = LinearLayout::vertical()
+        .child(table.with_id("table").full_screen())
+        .child(build_commit_bar(commit_bar_copy))
+        .child(build_status_bar(status_bar));
+    siv.add_layer(layout);
     siv.add_global_callback('q', |s| s.quit());
     siv.run();
 }

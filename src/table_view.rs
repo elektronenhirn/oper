@@ -554,7 +554,7 @@ impl<T: TableViewItem<H>, H: Eq + Hash + Copy + Clone + 'static> TableView<T, H>
 
             // Update scroll height to prevent out of index drawing
             self.scrollbase
-                .set_heights(self.last_size.y.saturating_sub(2), self.rows_to_items.len());
+                .set_heights(self.last_size.y, self.rows_to_items.len());
 
             // Remove actual item from the underlying storage
             Some(self.items.remove(item_index))
@@ -609,7 +609,7 @@ impl<T: TableViewItem<H>, H: Eq + Hash + Copy + Clone + 'static> TableView<T, H>
         }
     }
 
-    fn draw_item(&self, focused: bool,  printer: &Printer, i: usize) {
+    fn draw_item(&self, focused: bool, printer: &Printer, i: usize) {
         self.draw_columns(printer, " ", |printer, column| {
             let value = self.items[self.rows_to_items[i]].to_column(column.column);
             column.draw_row(focused, printer, value.as_str());
@@ -682,8 +682,8 @@ impl<T: TableViewItem<H> + 'static, H: Eq + Hash + Copy + Clone + 'static> View
     for TableView<T, H>
 {
     fn draw(&self, printer: &Printer) {
-
-//        let printer = &printer.offset((0, 2)).focused(true);
+        //        let printer = &printer.offset((0, 2)).focused(true);
+        let printer = &printer.focused(true);
         self.scrollbase.draw(printer, |printer, i| {
             if i < self.items.len() {
                 self.draw_item(self.focus == i, printer, i);
@@ -732,8 +732,7 @@ impl<T: TableViewItem<H> + 'static, H: Eq + Hash + Copy + Clone + 'static> View
             column.width = (remaining_width as f32 / remaining_columns as f32).floor() as usize;
         }
 
-        self.scrollbase
-            .set_heights(size.y.saturating_sub(2), item_count);
+        self.scrollbase.set_heights(size.y, item_count);
         self.last_size = size;
     }
 
@@ -852,7 +851,7 @@ pub struct TableColumn<H: Copy + Clone + 'static> {
     width: usize,
     default_order: Ordering,
     requested_width: Option<TableColumnWidth>,
-    color: theme::ColorStyle
+    color: theme::ColorStyle,
 }
 
 enum TableColumnWidth {
@@ -887,7 +886,7 @@ impl<H: Copy + Clone + 'static> TableColumn<H> {
         self
     }
 
-    pub fn color(mut self, color: theme::ColorStyle) -> Self{
+    pub fn color(mut self, color: theme::ColorStyle) -> Self {
         self.color = color;
         self
     }
@@ -902,7 +901,7 @@ impl<H: Copy + Clone + 'static> TableColumn<H> {
             width: 0,
             default_order: Ordering::Less,
             requested_width: None,
-            color: theme::ColorStyle::primary()
+            color: theme::ColorStyle::primary(),
         }
     }
 
@@ -943,9 +942,16 @@ impl<H: Copy + Clone + 'static> TableColumn<H> {
             HAlign::Right => format!("{:>width$} ", value, width = self.width),
             HAlign::Center => format!("{:^width$} ", value, width = self.width),
         };
-        printer.with_color(if focused {theme::ColorStyle::highlight()} else {self.color}, |printer|{
-            printer.print((0, 0), value.as_str());
-        });
+        printer.with_color(
+            if focused {
+                theme::ColorStyle::highlight()
+            } else {
+                self.color
+            },
+            |printer| {
+                printer.print((0, 0), value.as_str());
+            },
+        );
     }
 }
 

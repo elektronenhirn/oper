@@ -2,11 +2,13 @@
 extern crate clap;
 extern crate cursive;
 
-mod utils;
 mod model;
-mod ui;
 mod table_view;
+mod ui;
+mod utils;
 
+use clap::{App, Arg};
+use model::{MultiRepoHistory, Repo};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -14,9 +16,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::rc::Rc;
-use clap::{App, Arg};
 use utils::{find_project_file, find_repo_base_folder};
-use model::{MultiRepoHistory, Repo};
 
 fn main() -> Result<(), String> {
     let original_cwd = env::current_dir().expect("cwd not found");
@@ -52,21 +52,23 @@ fn main() -> Result<(), String> {
 
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
-    let project_file = find_project_file()?;
-    let project_file = File::open(project_file)?;
-    let history = create_history(project_file, days)?;
-//    println!("{:?}", history);
+    let project_file = File::open(find_project_file()?)?;
+    let history = build_history(project_file, days)?;
+
+    //    println!("{:?}", history);
     ui::show(history);
+
     Ok(())
 }
 
-fn create_history(project_file: std::fs::File, days: usize) -> Result<MultiRepoHistory, io::Error> {
+fn build_history(project_file: std::fs::File, days: usize) -> Result<MultiRepoHistory, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
     for project in BufReader::new(project_file).lines() {
-        let git_repo = base_folder.join(project.expect("project.list read error"));
-        repos.push(Rc::new(Repo::from(git_repo)));
+        let rel_path = project.expect("project.list read error");
+        let abs_path = base_folder.join(&rel_path);
+        repos.push(Rc::new(Repo::from(abs_path, rel_path)));
     }
     MultiRepoHistory::from_last_days(repos, days)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))

@@ -1,15 +1,15 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
-use git2::{Commit, Repository, Time};
+use git2::{Commit, Oid, Repository, Time};
+use std::cmp;
 use std::fmt;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::cmp;
 
 /// A history of commits across multiple
 /// repositories
 pub struct MultiRepoHistory {
-    repos: Vec<Rc<Repo>>,
+    pub repos: Vec<Rc<Repo>>,
     pub commits: Vec<Entry>,
     pub max_width_repo: usize,
     pub max_width_committer: usize,
@@ -37,7 +37,7 @@ impl MultiRepoHistory {
 
         for repo in &repos {
             max_width_repo = cmp::max(max_width_repo, repo.description.len());
-            let git_repo = Repository::open(&repo.path)?;
+            let git_repo = Repository::open(&repo.abs_path)?;
             let mut revwalk = git_repo.revwalk()?;
             revwalk.set_sorting(git2::Sort::TIME);
             revwalk.push_head()?;
@@ -52,10 +52,13 @@ impl MultiRepoHistory {
                 commits.push(entry);
             }
         }
-        commits.sort_unstable_by(|a,b|{
-          a.timestamp.cmp(&b.timestamp).reverse()
-        });
-        Ok(MultiRepoHistory { repos, commits, max_width_repo, max_width_committer })
+        commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
+        Ok(MultiRepoHistory {
+            repos,
+            commits,
+            max_width_repo,
+            max_width_committer,
+        })
     }
 }
 
@@ -71,14 +74,19 @@ impl fmt::Debug for MultiRepoHistory {
 
 /// representation of a local git repository
 pub struct Repo {
-    path: PathBuf,
+    pub abs_path: PathBuf,
+    pub rel_path: String,
     pub description: String,
 }
 
 impl Repo {
-    pub fn from(path: PathBuf) -> Repo {
-        let description = String::from(path.file_name().unwrap().to_str().unwrap());
-        Repo { path, description }
+    pub fn from(abs_path: PathBuf, rel_path: String) -> Repo {
+        let description = String::from(abs_path.file_name().unwrap().to_str().unwrap());
+        Repo {
+            abs_path,
+            rel_path,
+            description,
+        }
     }
 }
 
@@ -91,6 +99,7 @@ pub struct Entry {
     pub summary: String,
     pub author: String,
     pub committer: String,
+    pub commit_id: Oid,
 }
 
 impl Entry {
@@ -99,12 +108,14 @@ impl Entry {
         let summary = commit.summary().unwrap_or("None");
         let author = String::from(commit.author().name().unwrap_or("None"));
         let committer = String::from(commit.committer().name().unwrap_or("None"));
+        let commit_id = commit.id();
         Entry {
             repo,
             timestamp,
             summary: String::from(summary),
             author,
             committer,
+            commit_id,
         }
     }
 

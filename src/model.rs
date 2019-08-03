@@ -16,6 +16,11 @@ pub struct MultiRepoHistory {
     pub max_width_committer: usize,
 }
 
+pub struct CommitClassification {
+    pub include_commit: bool,
+    pub abort_walk: bool,
+}
+
 impl MultiRepoHistory {
     pub fn from_last_days(
         repos: Vec<Rc<Repo>>,
@@ -27,7 +32,8 @@ impl MultiRepoHistory {
             &|commit| {
                 let utc = as_datetime_utc(&commit.time());
                 let diff = chrono::Utc::now().signed_duration_since(utc);
-                diff.num_days() <= days as i64
+                let include_commit = diff.num_days() <= days as i64;
+                CommitClassification{include_commit, abort_walk: !include_commit}
             },
             &progress,
         )
@@ -35,7 +41,7 @@ impl MultiRepoHistory {
 
     pub fn from(
         repos: Vec<Rc<Repo>>,
-        pred: &Fn(&Commit) -> bool,
+        classify: &Fn(&Commit) -> CommitClassification,
         progress: &ProgressBar,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let mut commits = Vec::new();
@@ -51,12 +57,16 @@ impl MultiRepoHistory {
             for commit_id in revwalk {
                 let commit_id = commit_id?;
                 let commit = git_repo.find_commit(commit_id)?;
-                if !pred(&commit) {
-                    continue;
+
+                let classification = classify(&commit);
+                if classification.include_commit {
+                    let entry = Entry::from(repo.clone(), &commit);
+                    max_width_committer = cmp::max(max_width_committer, entry.committer.len());
+                    commits.push(entry);
                 }
-                let entry = Entry::from(repo.clone(), &commit);
-                max_width_committer = cmp::max(max_width_committer, entry.committer.len());
-                commits.push(entry);
+                if classification.abort_walk {
+                    break;
+                }
             }
             progress.inc(1);
         }

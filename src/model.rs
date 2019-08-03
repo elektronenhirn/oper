@@ -1,6 +1,7 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
 use git2::{Commit, Oid, Repository, Time};
+use indicatif::ProgressBar;
 use std::cmp;
 use std::fmt;
 use std::path::PathBuf;
@@ -19,17 +20,23 @@ impl MultiRepoHistory {
     pub fn from_last_days(
         repos: Vec<Rc<Repo>>,
         days: usize,
+        progress: &ProgressBar,
     ) -> Result<MultiRepoHistory, git2::Error> {
-        Self::from(repos, &|commit| {
-            let utc = as_datetime_utc(&commit.time());
-            let diff = chrono::Utc::now().signed_duration_since(utc);
-            diff.num_days() <= days as i64
-        })
+        Self::from(
+            repos,
+            &|commit| {
+                let utc = as_datetime_utc(&commit.time());
+                let diff = chrono::Utc::now().signed_duration_since(utc);
+                diff.num_days() <= days as i64
+            },
+            &progress,
+        )
     }
 
     pub fn from(
         repos: Vec<Rc<Repo>>,
         pred: &Fn(&Commit) -> bool,
+        progress: &ProgressBar,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let mut commits = Vec::new();
         let mut max_width_repo = 0;
@@ -51,6 +58,7 @@ impl MultiRepoHistory {
                 max_width_committer = cmp::max(max_width_committer, entry.committer.len());
                 commits.push(entry);
             }
+            progress.inc(1);
         }
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
         Ok(MultiRepoHistory {

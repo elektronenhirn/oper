@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate clap;
 extern crate cursive;
+extern crate indicatif;
 
 mod model;
 mod table_view;
@@ -8,6 +9,7 @@ mod ui;
 mod utils;
 
 use clap::{App, Arg};
+use indicatif::ProgressBar;
 use model::{MultiRepoHistory, Repo};
 use std::env;
 use std::error::Error;
@@ -53,7 +55,11 @@ fn main() -> Result<(), String> {
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = File::open(find_project_file()?)?;
-    let history = build_history(project_file, days)?;
+    println!("Collecting histories from repo repositories...");
+    let repos = repos_from(&project_file)?;
+    let progress_bar = ProgressBar::new(repos.len() as u64);
+    let history = MultiRepoHistory::from_last_days(repos, days, &progress_bar)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
 
     //    println!("{:?}", history);
     ui::show(history);
@@ -61,7 +67,7 @@ fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
     Ok(())
 }
 
-fn build_history(project_file: std::fs::File, days: usize) -> Result<MultiRepoHistory, io::Error> {
+fn repos_from(project_file: &std::fs::File) -> Result<Vec<Rc<Repo>>, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
@@ -70,6 +76,6 @@ fn build_history(project_file: std::fs::File, days: usize) -> Result<MultiRepoHi
         let abs_path = base_folder.join(&rel_path);
         repos.push(Rc::new(Repo::from(abs_path, rel_path)));
     }
-    MultiRepoHistory::from_last_days(repos, days)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))
+
+    Ok(repos)
 }

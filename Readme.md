@@ -5,6 +5,8 @@ It can show the history of the last _n_ days across all managed git repositories
 
 Oper is inspired by [tig](https://jonas.github.io/tig/), but is far for more basic. Don't expect any commands or additional views.
 
+![Screenshot](./screenshot.png)
+
 # Installation
 
 Oper is written in rust. You need the rust toolchain installed to be able to use it:

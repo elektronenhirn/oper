@@ -33,7 +33,10 @@ impl MultiRepoHistory {
                 let utc = as_datetime_utc(&commit.time());
                 let diff = chrono::Utc::now().signed_duration_since(utc);
                 let include_commit = diff.num_days() <= days as i64;
-                CommitClassification{include_commit, abort_walk: !include_commit}
+                CommitClassification {
+                    include_commit,
+                    abort_walk: !include_commit,
+                }
             },
             &progress,
         )
@@ -118,6 +121,7 @@ pub struct Entry {
     pub author: String,
     pub committer: String,
     pub commit_id: Oid,
+    pub message: String,
 }
 
 impl Entry {
@@ -127,6 +131,8 @@ impl Entry {
         let author = String::from(commit.author().name().unwrap_or("None"));
         let committer = String::from(commit.committer().name().unwrap_or("None"));
         let commit_id = commit.id();
+        let message = commit.message().unwrap_or("").to_string();
+
         Entry {
             repo,
             timestamp,
@@ -134,6 +140,7 @@ impl Entry {
             author,
             committer,
             commit_id,
+            message,
         }
     }
 

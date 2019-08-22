@@ -22,4 +22,5 @@ cargo install oper
 # Usage
 
 - Define the number of days to include in the history with the _--days_ cli switch
+- Press Enter on any change in the list to get a more detailed view
 - Quit oper by pressing _q_

@@ -1,8 +1,10 @@
 use crate::model::{Entry, MultiRepoHistory};
 use crate::table_view::{TableView, TableViewItem};
-use cursive::theme::{BaseColor, Color, ColorStyle};
+use cursive::theme::{BaseColor, Color, ColorStyle, Style};
 use cursive::traits::*;
+use cursive::utils::span::SpannedString;
 use cursive::views::{Canvas, LinearLayout};
+use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -76,6 +78,22 @@ fn update_commit_bar(
     ));
 }
 
+#[rustfmt::skip]
+fn build_commit_view(entry: &Entry) -> TextView{
+    let mut text = SpannedString::<Style>::plain("");
+
+    text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
+    text.append_styled(format!("Id:         {}\n", entry.commit_id),     ColorStyle::primary());
+    text.append_styled(format!("Author:     {}\n", entry.author),        ColorStyle::tertiary() );
+    text.append_styled(format!("Commit:     {}\n", entry.committer),     ColorStyle::tertiary() );
+    text.append_styled(format!("CommitDate: {}\n", entry.time_as_str()), ColorStyle::secondary() );
+    text.append("\n");
+
+    text.append(&entry.message);
+
+    TextView::new(text)
+}
+
 pub fn show(model: MultiRepoHistory) {
     let commit_bar = Rc::new(RefCell::new(String::from("")));
     let commit_bar_copy = commit_bar.clone();
@@ -113,6 +131,21 @@ pub fn show(model: MultiRepoHistory) {
             .unwrap();
         update_commit_bar(&commit_bar, index, commits, &entry);
     });
+
+    table.set_on_submit(|siv: &mut Cursive, _row: usize, index: usize| {
+        let entry = siv
+            .call_on_id("table", move |table: &mut TableView<Entry, Column>| {
+                table.borrow_item(index).unwrap().clone()
+            })
+            .unwrap();
+
+        siv.add_layer(
+            Dialog::around(build_commit_view(&entry)).button("Ok", move |s| {
+                s.pop_layer();
+            }),
+        );
+    });
+
     table.set_selected_row(0);
     let layout = LinearLayout::vertical()
         .child(table.with_id("table").full_screen())

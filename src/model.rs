@@ -35,11 +35,17 @@ impl MultiRepoHistory {
             for commit_id in revwalk {
                 let commit_id = commit_id?;
                 let commit = git_repo.find_commit(commit_id)?;
-                let classification = classifiers.iter().fold(CommitClassification::default(), |sum, x|{
-                    let classification = x.classify(&commit);
-                    CommitClassification{abort_walk: sum.abort_walk && classification.abort_walk, include: sum.include && classification.include}
-                });
-//                let classification = classify(&commit);
+                let classification =
+                    classifiers
+                        .iter()
+                        .fold(CommitClassification::default(), |sum, x| {
+                            let classification = x.classify(&commit);
+                            CommitClassification {
+                                abort_walk: sum.abort_walk && classification.abort_walk,
+                                include: sum.include && classification.include,
+                            }
+                        });
+                //                let classification = classify(&commit);
                 if classification.include {
                     let entry = RepoCommit::from(repo.clone(), &commit);
                     max_width_committer = cmp::max(max_width_committer, entry.committer.len());
@@ -157,9 +163,12 @@ pub struct CommitClassification {
     pub abort_walk: bool,
 }
 
-impl CommitClassification{
+impl CommitClassification {
     pub fn default() -> Self {
-        Self{include: true, abort_walk: false}
+        Self {
+            include: true,
+            abort_walk: false,
+        }
     }
 }
 
@@ -170,7 +179,7 @@ pub trait CommitClassifier {
 pub struct AgeClassifier(pub usize);
 
 impl CommitClassifier for AgeClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification{
+    fn classify(&self, commit: &Commit) -> CommitClassification {
         let utc = as_datetime_utc(&commit.time());
         let diff = chrono::Utc::now().signed_duration_since(utc);
         let include = diff.num_days() <= self.0 as i64;
@@ -184,9 +193,11 @@ impl CommitClassifier for AgeClassifier {
 pub struct AuthorClassifier(pub String);
 
 impl CommitClassifier for AuthorClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification{
+    fn classify(&self, commit: &Commit) -> CommitClassification {
         let author = commit.author().name().unwrap_or("").to_ascii_lowercase();
-        CommitClassification{include: author.contains(&self.0.to_lowercase()), abort_walk: false}
+        CommitClassification {
+            include: author.contains(&self.0.to_lowercase()),
+            abort_walk: false,
+        }
     }
-
 }

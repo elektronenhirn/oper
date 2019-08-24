@@ -10,7 +10,7 @@ mod utils;
 
 use clap::{App, Arg};
 use indicatif::ProgressBar;
-use model::{MultiRepoHistory, Repo, CommitClassifier, AgeClassifier, AuthorClassifier};
+use model::{AgeClassifier, AuthorClassifier, CommitClassifier, MultiRepoHistory, Repo};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -40,7 +40,9 @@ fn main() -> Result<(), String> {
                 .short("a")
                 .long("author")
                 .value_name("author")
-                .help("only include commits where author's name includes <author> (case insensitive)")
+                .help(
+                    "only include commits where author's name includes <author> (case insensitive)",
+                )
                 .takes_value(true),
         )
         .arg(
@@ -62,13 +64,13 @@ fn main() -> Result<(), String> {
 
     match matches.value_of("author") {
         Some(pattern) => classifiers.push(Box::from(AuthorClassifier(pattern.into()))),
-        None => ()
+        None => (),
     }
 
     do_main(classifiers, cwd).or_else(|e| Err(e.description().into()))
 }
 
-fn do_main(classifiers: Vec::<Box<CommitClassifier>>, cwd: &Path) -> Result<(), io::Error> {
+fn do_main(classifiers: Vec<Box<CommitClassifier>>, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = File::open(find_project_file()?)?;
     println!("Collecting histories from repo repositories...");
@@ -96,4 +98,3 @@ fn repos_from(project_file: &std::fs::File) -> Result<Vec<Rc<Repo>>, io::Error> 
 
     Ok(repos)
 }
-

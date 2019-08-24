@@ -1,4 +1,4 @@
-use crate::model::{RepoCommit, MultiRepoHistory};
+use crate::model::{MultiRepoHistory, RepoCommit};
 use crate::table_view::{TableView, TableViewItem};
 use cursive::theme::{BaseColor, Color, ColorStyle, Style};
 use cursive::traits::*;

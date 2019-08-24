@@ -32,7 +32,7 @@ fn main() -> Result<(), String> {
                 .long("days")
                 .value_name("days")
                 .help("include history of the last <n> days")
-                .default_value("10")
+                .default_value("100")
                 .takes_value(true),
         )
         .arg(

@@ -1,4 +1,4 @@
-use crate::model::{Entry, MultiRepoHistory};
+use crate::model::{RepoCommit, MultiRepoHistory};
 use crate::table_view::{TableView, TableViewItem};
 use cursive::theme::{BaseColor, Color, ColorStyle, Style};
 use cursive::traits::*;
@@ -19,7 +19,7 @@ enum Column {
     Summary,
 }
 
-impl TableViewItem<Column> for Entry {
+impl TableViewItem<Column> for RepoCommit {
     fn to_column(&self, column: Column) -> String {
         match column {
             Column::CommitDateTime => self.time_as_str(),
@@ -68,7 +68,7 @@ fn update_commit_bar(
     commit_bar_model: &Rc<RefCell<String>>,
     index: usize,
     size: usize,
-    entry: &Entry,
+    entry: &RepoCommit,
 ) {
     (*commit_bar_model).replace(format!(
         "Commit {} of {} - {}",
@@ -79,7 +79,7 @@ fn update_commit_bar(
 }
 
 #[rustfmt::skip]
-fn build_commit_view(entry: &Entry) -> TextView{
+fn build_commit_view(entry: &RepoCommit) -> TextView{
     let mut text = SpannedString::<Style>::plain("");
 
     text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
@@ -110,7 +110,7 @@ pub fn show(model: MultiRepoHistory) {
     let mut siv = Cursive::default();
     siv.load_toml(include_str!("../assets/style.toml")).unwrap();
 
-    let mut table = TableView::<Entry, Column>::new()
+    let mut table = TableView::<RepoCommit, Column>::new()
         .column(Column::CommitDateTime, "Commit", |c| c.width(22))
         .column(Column::Repo, "Repo", |c| {
             c.width(model.max_width_repo).color(ColorStyle::secondary())
@@ -125,7 +125,7 @@ pub fn show(model: MultiRepoHistory) {
     table.set_items(model.commits);
     table.set_on_select(move |siv: &mut Cursive, _row: usize, index: usize| {
         let entry = siv
-            .call_on_id("table", move |table: &mut TableView<Entry, Column>| {
+            .call_on_id("table", move |table: &mut TableView<RepoCommit, Column>| {
                 table.borrow_item(index).unwrap().clone()
             })
             .unwrap();
@@ -134,7 +134,7 @@ pub fn show(model: MultiRepoHistory) {
 
     table.set_on_submit(|siv: &mut Cursive, _row: usize, index: usize| {
         let entry = siv
-            .call_on_id("table", move |table: &mut TableView<Entry, Column>| {
+            .call_on_id("table", move |table: &mut TableView<RepoCommit, Column>| {
                 table.borrow_item(index).unwrap().clone()
             })
             .unwrap();

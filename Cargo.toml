@@ -10,11 +10,11 @@ readme = "README.md"
 repository = "https://github.com/elektronenhirn/oper.git"
 
 [dependencies]
-cursive = { version = "0.12" }
-git2 = "0.9.1"
-clap = "2.33.0"
 chrono = "0.4.7"
+clap = "2.33.0"
+cursive = "0.12"
+git2 = "0.9.1"
+indicatif = "0.11.0"
 log = "0.4.7"
 simple_logger = "1.3.0"
 time = "0.1.39"
-indicatif = "0.11.0"

@@ -11,7 +11,7 @@ use std::rc::Rc;
 /// repositories
 pub struct MultiRepoHistory {
     pub repos: Vec<Rc<Repo>>,
-    pub commits: Vec<Entry>,
+    pub commits: Vec<RepoCommit>,
     pub max_width_repo: usize,
     pub max_width_committer: usize,
 }
@@ -63,7 +63,7 @@ impl MultiRepoHistory {
 
                 let classification = classify(&commit);
                 if classification.include_commit {
-                    let entry = Entry::from(repo.clone(), &commit);
+                    let entry = RepoCommit::from(repo.clone(), &commit);
                     max_width_committer = cmp::max(max_width_committer, entry.committer.len());
                     commits.push(entry);
                 }
@@ -102,7 +102,7 @@ pub struct Repo {
 
 impl Repo {
     pub fn from(abs_path: PathBuf, rel_path: String) -> Repo {
-        let description = String::from(abs_path.file_name().unwrap().to_str().unwrap());
+        let description = abs_path.file_name().unwrap().to_str().unwrap().into();
         Repo {
             abs_path,
             rel_path,
@@ -114,7 +114,7 @@ impl Repo {
 /// representation of a git commit associated
 /// with a local git repository
 #[derive(Clone)]
-pub struct Entry {
+pub struct RepoCommit {
     pub repo: Rc<Repo>,
     pub timestamp: Time,
     pub summary: String,
@@ -124,19 +124,19 @@ pub struct Entry {
     pub message: String,
 }
 
-impl Entry {
-    pub fn from(repo: Rc<Repo>, commit: &Commit) -> Entry {
+impl RepoCommit {
+    pub fn from(repo: Rc<Repo>, commit: &Commit) -> RepoCommit {
         let timestamp = commit.time();
         let summary = commit.summary().unwrap_or("None");
-        let author = String::from(commit.author().name().unwrap_or("None"));
-        let committer = String::from(commit.committer().name().unwrap_or("None"));
+        let author = commit.author().name().unwrap_or("None").into();
+        let committer = commit.committer().name().unwrap_or("None").into();
         let commit_id = commit.id();
         let message = commit.message().unwrap_or("").to_string();
 
-        Entry {
+        RepoCommit {
             repo,
             timestamp,
-            summary: String::from(summary),
+            summary: summary.into(),
             author,
             committer,
             commit_id,
@@ -146,7 +146,7 @@ impl Entry {
 
     pub fn time_as_str(&self) -> String {
         let date_time = as_datetime(&self.timestamp);
-        let offset = Duration::seconds(date_time.offset().local_minus_utc() as i64);
+        let offset = Duration::seconds(i64::from(date_time.offset().local_minus_utc()));
 
         format!(
             "{:04}-{:02}-{:02} {:02}:{:02} {:+02}{:02}",
@@ -161,11 +161,11 @@ impl Entry {
     }
 }
 
-impl fmt::Debug for Entry {
+impl fmt::Debug for RepoCommit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "{} {:10.10} {:10.10} {}\n",
+            "{} {:10.10} {:10.10} {}",
             self.time_as_str(),
             self.repo.description,
             self.committer,

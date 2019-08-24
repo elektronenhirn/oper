@@ -49,7 +49,7 @@ fn main() -> Result<(), String> {
     let days = value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    do_main(days, cwd).or_else(|e| Err(String::from(e.description())))
+    do_main(days, cwd).or_else(|e| Err(e.description().into()))
 }
 
 fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {

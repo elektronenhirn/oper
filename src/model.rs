@@ -180,3 +180,13 @@ impl CommitClassifier for AgeClassifier {
         }
     }
 }
+
+pub struct AuthorClassifier(pub String);
+
+impl CommitClassifier for AuthorClassifier {
+    fn classify(&self, commit: &Commit) -> CommitClassification{
+        let author = commit.author().name().unwrap_or("").to_ascii_lowercase();
+        CommitClassification{include: author.contains(&self.0.to_lowercase()), abort_walk: false}
+    }
+
+}

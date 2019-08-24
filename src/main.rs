@@ -10,7 +10,7 @@ mod utils;
 
 use clap::{App, Arg};
 use indicatif::ProgressBar;
-use model::{MultiRepoHistory, Repo, CommitClassifier, AgeClassifier};
+use model::{MultiRepoHistory, Repo, CommitClassifier, AgeClassifier, AuthorClassifier};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -36,6 +36,14 @@ fn main() -> Result<(), String> {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("author")
+                .short("a")
+                .long("author")
+                .value_name("author")
+                .help("only include commits where author's name includes <author> (case insensitive)")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("cwd")
                 .short("C")
                 .long("cwd")
@@ -51,6 +59,11 @@ fn main() -> Result<(), String> {
 
     let mut classifiers = Vec::<Box<CommitClassifier>>::new();
     classifiers.push(Box::from(AgeClassifier(days)));
+
+    match matches.value_of("author") {
+        Some(pattern) => classifiers.push(Box::from(AuthorClassifier(pattern.into()))),
+        None => ()
+    }
 
     do_main(classifiers, cwd).or_else(|e| Err(e.description().into()))
 }

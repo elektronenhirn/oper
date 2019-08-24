@@ -16,35 +16,10 @@ pub struct MultiRepoHistory {
     pub max_width_committer: usize,
 }
 
-pub struct CommitClassification {
-    pub include_commit: bool,
-    pub abort_walk: bool,
-}
-
 impl MultiRepoHistory {
-    pub fn from_last_days(
-        repos: Vec<Rc<Repo>>,
-        days: usize,
-        progress: &ProgressBar,
-    ) -> Result<MultiRepoHistory, git2::Error> {
-        Self::from(
-            repos,
-            &|commit| {
-                let utc = as_datetime_utc(&commit.time());
-                let diff = chrono::Utc::now().signed_duration_since(utc);
-                let include_commit = diff.num_days() <= days as i64;
-                CommitClassification {
-                    include_commit,
-                    abort_walk: !include_commit,
-                }
-            },
-            &progress,
-        )
-    }
-
     pub fn from(
         repos: Vec<Rc<Repo>>,
-        classify: &Fn(&Commit) -> CommitClassification,
+        classifiers: Vec<Box<CommitClassifier>>,
         progress: &ProgressBar,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let mut commits = Vec::new();
@@ -60,9 +35,12 @@ impl MultiRepoHistory {
             for commit_id in revwalk {
                 let commit_id = commit_id?;
                 let commit = git_repo.find_commit(commit_id)?;
-
-                let classification = classify(&commit);
-                if classification.include_commit {
+                let classification = classifiers.iter().fold(CommitClassification::default(), |sum, x|{
+                    let classification = x.classify(&commit);
+                    CommitClassification{abort_walk: sum.abort_walk && classification.abort_walk, include: sum.include && classification.include}
+                });
+//                let classification = classify(&commit);
+                if classification.include {
                     let entry = RepoCommit::from(repo.clone(), &commit);
                     max_width_committer = cmp::max(max_width_committer, entry.committer.len());
                     commits.push(entry);
@@ -171,5 +149,34 @@ impl fmt::Debug for RepoCommit {
             self.committer,
             self.summary
         )
+    }
+}
+
+pub struct CommitClassification {
+    pub include: bool,
+    pub abort_walk: bool,
+}
+
+impl CommitClassification{
+    pub fn default() -> Self {
+        Self{include: true, abort_walk: false}
+    }
+}
+
+pub trait CommitClassifier {
+    fn classify(&self, commit: &Commit) -> CommitClassification;
+}
+
+pub struct AgeClassifier(pub usize);
+
+impl CommitClassifier for AgeClassifier {
+    fn classify(&self, commit: &Commit) -> CommitClassification{
+        let utc = as_datetime_utc(&commit.time());
+        let diff = chrono::Utc::now().signed_duration_since(utc);
+        let include = diff.num_days() <= self.0 as i64;
+        CommitClassification {
+            include,
+            abort_walk: !include,
+        }
     }
 }

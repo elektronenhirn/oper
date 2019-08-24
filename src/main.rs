@@ -10,7 +10,7 @@ mod utils;
 
 use clap::{App, Arg};
 use indicatif::ProgressBar;
-use model::{MultiRepoHistory, Repo};
+use model::{MultiRepoHistory, Repo, CommitClassifier, AgeClassifier};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -49,16 +49,20 @@ fn main() -> Result<(), String> {
     let days = value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    do_main(days, cwd).or_else(|e| Err(e.description().into()))
+    let mut classifiers = Vec::<Box<CommitClassifier>>::new();
+    classifiers.push(Box::from(AgeClassifier(days)));
+
+    do_main(classifiers, cwd).or_else(|e| Err(e.description().into()))
 }
 
-fn do_main(days: usize, cwd: &Path) -> Result<(), io::Error> {
+fn do_main(classifiers: Vec::<Box<CommitClassifier>>, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = File::open(find_project_file()?)?;
     println!("Collecting histories from repo repositories...");
     let repos = repos_from(&project_file)?;
     let progress_bar = ProgressBar::new(repos.len() as u64);
-    let history = MultiRepoHistory::from_last_days(repos, days, &progress_bar)
+
+    let history = MultiRepoHistory::from(repos, classifiers, &progress_bar)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
 
     //    println!("{:?}", history);
@@ -79,3 +83,4 @@ fn repos_from(project_file: &std::fs::File) -> Result<Vec<Rc<Repo>>, io::Error> 
 
     Ok(repos)
 }
+

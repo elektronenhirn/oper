@@ -10,7 +10,9 @@ mod utils;
 
 use clap::{App, Arg};
 use indicatif::ProgressBar;
-use model::{AgeClassifier, AuthorClassifier, CommitClassifier, MultiRepoHistory, Repo};
+use model::{
+    AgeClassifier, AuthorClassifier, CommitClassifier, MessageClassifier, MultiRepoHistory, Repo,
+};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -39,10 +41,18 @@ fn main() -> Result<(), String> {
             Arg::with_name("author")
                 .short("a")
                 .long("author")
-                .value_name("author")
+                .value_name("pattern")
                 .help(
-                    "only include commits where author's name includes <author> (case insensitive)",
+                    "only include commits where author's name contains <pattern> (case insensitive)",
                 )
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("message")
+                .short("m")
+                .long("message")
+                .value_name("pattern")
+                .help("only include commits where message contains <pattern> (case insensitive)")
                 .takes_value(true),
         )
         .arg(
@@ -64,6 +74,10 @@ fn main() -> Result<(), String> {
 
     match matches.value_of("author") {
         Some(pattern) => classifiers.push(Box::from(AuthorClassifier(pattern.into()))),
+        None => (),
+    }
+    match matches.value_of("message") {
+        Some(pattern) => classifiers.push(Box::from(MessageClassifier(pattern.into()))),
         None => (),
     }
 

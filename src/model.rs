@@ -201,3 +201,15 @@ impl CommitClassifier for AuthorClassifier {
         }
     }
 }
+
+pub struct MessageClassifier(pub String);
+
+impl CommitClassifier for MessageClassifier {
+    fn classify(&self, commit: &Commit) -> CommitClassification {
+        let author = commit.message().unwrap_or("").to_ascii_lowercase();
+        CommitClassification {
+            include: author.contains(&self.0.to_lowercase()),
+            abort_walk: false,
+        }
+    }
+}

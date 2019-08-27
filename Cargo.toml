@@ -1,6 +1,6 @@
 [package]
 name = "oper"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Florian Bramer <elektronenhirn@gmail.com>"]
 description = "Command line tool to browse changes across multiple git repositories managed by google's git-repo tool"
 edition = "2018"

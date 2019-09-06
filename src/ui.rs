@@ -3,7 +3,7 @@ use crate::table_view::{TableView, TableViewItem};
 use cursive::theme::{BaseColor, Color, ColorStyle, Style};
 use cursive::traits::*;
 use cursive::utils::span::SpannedString;
-use cursive::views::{Canvas, LinearLayout};
+use cursive::views::{Canvas, LayerPosition, LinearLayout, ScrollView};
 use cursive::views::{Dialog, TextView};
 use cursive::Cursive;
 use std::cell::RefCell;
@@ -90,6 +90,8 @@ fn build_commit_view(entry: &RepoCommit) -> TextView{
     text.append("\n");
 
     text.append(&entry.message);
+    text.append("---\n");
+    text.append(&entry.diff().unwrap_or("<no diff>".to_string()));
 
     TextView::new(text)
 }
@@ -139,11 +141,7 @@ pub fn show(model: MultiRepoHistory) {
             })
             .unwrap();
 
-        siv.add_layer(
-            Dialog::around(build_commit_view(&entry)).button("Ok", move |s| {
-                s.pop_layer();
-            }),
-        );
+        siv.add_layer(Dialog::around(ScrollView::new(build_commit_view(&entry))));
     });
 
     table.set_selected_row(0);
@@ -152,6 +150,11 @@ pub fn show(model: MultiRepoHistory) {
         .child(build_commit_bar(commit_bar_copy))
         .child(build_status_bar(status_bar));
     siv.add_layer(layout);
-    siv.add_global_callback('q', |s| s.quit());
+    siv.add_global_callback('q', |s| {
+        s.pop_layer();
+        if s.screen().get(LayerPosition::FromBack(0)).is_none() {
+            s.quit();
+        }
+    });
     siv.run();
 }

@@ -1,6 +1,6 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
-use git2::{Commit, Oid, Repository, Time};
+use git2::{Commit, DiffFormat, Oid, Repository, Time};
 use indicatif::ProgressBar;
 use std::cmp;
 use std::fmt;
@@ -142,6 +142,29 @@ impl RepoCommit {
             offset.num_hours(),
             offset.num_minutes() - offset.num_hours() * 60
         )
+    }
+
+    pub fn diff(&self) -> Result<String, git2::Error> {
+        let git_repo = Repository::open(&self.repo.abs_path)?;
+        let commit = git_repo.find_commit(self.commit_id)?;
+        let a = if commit.parents().len() == 1 {
+            let parent = commit.parent(0)?;
+            Some(parent.tree()?)
+        } else {
+            None
+        };
+        let b = commit.tree()?;
+        let diff = git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None)?;
+        let mut as_text = String::default();
+        diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+            match line.origin() {
+                ' ' | '+' | '-' => as_text += &line.origin().to_string(),
+                _ => {}
+            }
+            as_text += std::str::from_utf8(line.content()).unwrap();
+            true
+        })?;
+        Ok(as_text)
     }
 }
 

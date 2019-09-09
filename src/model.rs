@@ -19,7 +19,7 @@ pub struct MultiRepoHistory {
 impl MultiRepoHistory {
     pub fn from(
         repos: Vec<Rc<Repo>>,
-        classifiers: Vec<Box<CommitClassifier>>,
+        classifiers: Vec<&dyn CommitClassifier>,
         progress: &ProgressBar,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let mut commits = Vec::new();

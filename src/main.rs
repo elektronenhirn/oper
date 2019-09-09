@@ -13,6 +13,7 @@ use indicatif::ProgressBar;
 use model::{
     AgeClassifier, AuthorClassifier, CommitClassifier, MessageClassifier, MultiRepoHistory, Repo,
 };
+use std::convert::Into;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -69,22 +70,31 @@ fn main() -> Result<(), String> {
     let days = value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    let mut classifiers = Vec::<Box<CommitClassifier>>::new();
-    classifiers.push(Box::from(AgeClassifier(days)));
+    let mut classifiers = Vec::<&dyn CommitClassifier>::new();
 
-    match matches.value_of("author") {
-        Some(pattern) => classifiers.push(Box::from(AuthorClassifier(pattern.into()))),
-        None => (),
+    let age_classifier = AgeClassifier(days);
+    classifiers.push(&age_classifier);
+
+    let author_classifier = matches
+        .value_of("author")
+        .map(Into::into)
+        .map(AuthorClassifier);
+    if let Some(ref c) = author_classifier {
+        classifiers.push(c);
     }
-    match matches.value_of("message") {
-        Some(pattern) => classifiers.push(Box::from(MessageClassifier(pattern.into()))),
-        None => (),
+
+    let message_classifier = matches
+        .value_of("message")
+        .map(Into::into)
+        .map(MessageClassifier);
+    if let Some(ref c) = message_classifier {
+        classifiers.push(c);
     }
 
     do_main(classifiers, cwd).or_else(|e| Err(e.description().into()))
 }
 
-fn do_main(classifiers: Vec<Box<CommitClassifier>>, cwd: &Path) -> Result<(), io::Error> {
+fn do_main(classifiers: Vec<&dyn CommitClassifier>, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd).expect("changing cwd failed");
     let project_file = File::open(find_project_file()?)?;
     println!("Collecting histories from repo repositories...");

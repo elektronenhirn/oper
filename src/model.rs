@@ -1,7 +1,8 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
+use console::style;
 use git2::{Commit, DiffFormat, Oid, Repository, Time};
-use indicatif::ProgressBar;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::fmt;
 use std::path::PathBuf;
@@ -20,30 +21,90 @@ impl MultiRepoHistory {
         repos: Vec<Arc<Repo>>,
         classifier: &Classifier,
     ) -> Result<MultiRepoHistory, git2::Error> {
-        let progress = ProgressBar::new(repos.len() as u64);
+        let pb_style =
+            ProgressStyle::default_spinner().template("{spinner:.bold.cyan} {wide_msg:.bold.dim}");
+        let progress = MultiProgress::new();
+        let bars = (0..rayon::current_num_threads())
+            .map(|_| {
+                let pb = ProgressBar::new(0);
+                pb.set_style(pb_style.clone());
+                progress.add(pb)
+            })
+            .collect::<Vec<ProgressBar>>();
 
-        // TODO: This needs a strategy for error reporting
+        std::thread::spawn(move || {
+            progress.join_and_clear().unwrap();
+        });
+
         let mut commits: Vec<RepoCommit> = repos
             .par_iter()
             .filter_map(move |repo| {
+                let progress = &bars[rayon::current_thread_index().unwrap()];
+                progress.set_message(&format!("Scanning {}", repo.rel_path));
                 let mut commits = Vec::new();
-                let git_repo = Repository::open(&repo.abs_path).ok()?;
-                let mut revwalk = git_repo.revwalk().ok()?;
+                let git_repo = match Repository::open(&repo.abs_path) {
+                    Ok(git_repo) => git_repo,
+                    Err(e) => {
+                        progress.println(format!(
+                            "{}: Failed to open: {}",
+                            style(repo.rel_path.to_string()).cyan(),
+                            e
+                        ));
+                        progress.set_message("Idle");
+                        return None;
+                    }
+                };
+
+                let mut revwalk = match git_repo.revwalk() {
+                    Ok(revwalk) => revwalk,
+                    Err(e) => {
+                        progress.println(format!(
+                            "{}: Failed to create revwalk: {}",
+                            style(repo.rel_path.to_string()).cyan(),
+                            e
+                        ));
+                        progress.set_message("Idle");
+                        return None;
+                    }
+                };
                 revwalk.set_sorting(git2::Sort::TIME);
-                revwalk.push_head().ok()?;
+
+                if let Err(e) = revwalk.push_head() {
+                    progress.println(format!(
+                        "{}: Failed to query history: {}",
+                        style(repo.rel_path.to_string()).cyan(),
+                        e
+                    ));
+                    progress.set_message("Idle");
+                    return None;
+                }
+
                 for commit_id in revwalk {
-                    let commit_id = commit_id.ok()?;
-                    let commit = git_repo.find_commit(commit_id).ok()?;
+                    let commit =
+                        match commit_id.and_then(|commit_id| git_repo.find_commit(commit_id)) {
+                            Ok(commit) => commit,
+                            Err(e) => {
+                                progress.println(format!(
+                                    "{}: Failed to find commit: {}",
+                                    style(repo.rel_path.to_string()).cyan(),
+                                    e
+                                ));
+                                progress.set_message("Idle");
+                                return None;
+                            }
+                        };
                     let (include, abort) = classifier.classify(&commit);
                     if include {
                         let entry = RepoCommit::from(repo.clone(), &commit);
                         commits.push(entry);
                     }
                     if abort {
+                        progress.set_message("Idle");
                         break;
                     }
                 }
                 progress.inc(1);
+                progress.set_message("Idle");
                 Some(commits)
             })
             .flatten()

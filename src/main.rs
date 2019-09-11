@@ -76,9 +76,8 @@ fn main() -> Result<(), String> {
 }
 
 fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> {
-    env::set_current_dir(cwd).expect("changing cwd failed");
+    env::set_current_dir(cwd)?;
     let project_file = File::open(find_project_file()?)?;
-    println!("Collecting histories from repo repositories...");
     let repos = repos_from(&project_file)?;
 
     let history = MultiRepoHistory::from(repos, &classifier)

@@ -91,7 +91,7 @@ fn build_commit_view(entry: &RepoCommit) -> TextView{
 
     text.append(&entry.message);
     text.append("---\n");
-    text.append(&entry.diff().unwrap_or("<no diff>".to_string()));
+    text.append(&entry.diff().unwrap_or_else(|_| "<no diff>".to_string()));
 
     TextView::new(text)
 }

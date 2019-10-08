@@ -9,17 +9,15 @@ mod ui;
 mod utils;
 
 use clap::{App, Arg};
-use indicatif::ProgressBar;
-use model::{
-    AgeClassifier, AuthorClassifier, CommitClassifier, MessageClassifier, MultiRepoHistory, Repo,
-};
+use model::{MultiRepoHistory, Repo};
+use std::convert::Into;
 use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 use utils::{find_project_file, find_repo_base_folder};
 
 fn main() -> Result<(), String> {
@@ -66,48 +64,38 @@ fn main() -> Result<(), String> {
         )
         .get_matches();
 
-    let days = value_t!(matches.value_of("days"), usize).unwrap_or_else(|e| e.exit());
+    let days = value_t!(matches.value_of("days"), u32).unwrap_or_else(|e| e.exit());
+    let classifier = model::Classifier::new(
+        days,
+        matches.value_of("message"),
+        matches.value_of("author"),
+    );
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    let mut classifiers = Vec::<Box<CommitClassifier>>::new();
-    classifiers.push(Box::from(AgeClassifier(days)));
-
-    match matches.value_of("author") {
-        Some(pattern) => classifiers.push(Box::from(AuthorClassifier(pattern.into()))),
-        None => (),
-    }
-    match matches.value_of("message") {
-        Some(pattern) => classifiers.push(Box::from(MessageClassifier(pattern.into()))),
-        None => (),
-    }
-
-    do_main(classifiers, cwd).or_else(|e| Err(e.description().into()))
+    do_main(&classifier, cwd).or_else(|e| Err(e.description().into()))
 }
 
-fn do_main(classifiers: Vec<Box<CommitClassifier>>, cwd: &Path) -> Result<(), io::Error> {
-    env::set_current_dir(cwd).expect("changing cwd failed");
+fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> {
+    env::set_current_dir(cwd)?;
     let project_file = File::open(find_project_file()?)?;
-    println!("Collecting histories from repo repositories...");
     let repos = repos_from(&project_file)?;
-    let progress_bar = ProgressBar::new(repos.len() as u64);
 
-    let history = MultiRepoHistory::from(repos, classifiers, &progress_bar)
+    let history = MultiRepoHistory::from(repos, &classifier)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
 
-    //    println!("{:?}", history);
     ui::show(history);
 
     Ok(())
 }
 
-fn repos_from(project_file: &std::fs::File) -> Result<Vec<Rc<Repo>>, io::Error> {
+fn repos_from(project_file: &std::fs::File) -> Result<Vec<Arc<Repo>>, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
     for project in BufReader::new(project_file).lines() {
         let rel_path = project.expect("project.list read error");
         let abs_path = base_folder.join(&rel_path);
-        repos.push(Rc::new(Repo::from(abs_path, rel_path)));
+        repos.push(Arc::new(Repo::from(abs_path, rel_path)));
     }
 
     Ok(repos)

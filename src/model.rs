@@ -1,16 +1,17 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
+use console::style;
 use git2::{Commit, DiffFormat, Oid, Repository, Time};
-use indicatif::ProgressBar;
-use std::cmp;
+use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use std::fmt;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
 
-/// A history of commits across multiple
-/// repositories
+/// A history of commits across multiple repositories
 pub struct MultiRepoHistory {
-    pub repos: Vec<Rc<Repo>>,
+    pub repos: Vec<Arc<Repo>>,
     pub commits: Vec<RepoCommit>,
     pub max_width_repo: usize,
     pub max_width_committer: usize,
@@ -18,45 +19,88 @@ pub struct MultiRepoHistory {
 
 impl MultiRepoHistory {
     pub fn from(
-        repos: Vec<Rc<Repo>>,
-        classifiers: Vec<Box<CommitClassifier>>,
-        progress: &ProgressBar,
+        repos: Vec<Arc<Repo>>,
+        classifier: &Classifier,
     ) -> Result<MultiRepoHistory, git2::Error> {
-        let mut commits = Vec::new();
-        let mut max_width_repo = 0;
-        let mut max_width_committer = 0;
+        let progress = MultiProgress::new();
+        let progress_bars = (0..rayon::current_num_threads())
+            .enumerate()
+            .map(|(n, _)| {
+                let pb = ProgressBar::hidden();
+                pb.set_prefix(&n.to_string());
+                pb.set_style(
+                    ProgressStyle::default_spinner().template("[{prefix}] {wide_msg:.bold.dim}"),
+                );
+                progress.add(pb)
+            })
+            .collect::<Vec<ProgressBar>>();
+        let overall_progress = ProgressBar::new(repos.len() as u64);
+        overall_progress.set_style(
+            ProgressStyle::default_bar()
+                .template(" {spinner:.bold.cyan}  Scanned {pos} of {len} repositories"),
+        );
+        let overall_progress = progress.add(overall_progress);
 
-        for repo in &repos {
-            max_width_repo = cmp::max(max_width_repo, repo.description.len());
-            let git_repo = Repository::open(&repo.abs_path)?;
-            let mut revwalk = git_repo.revwalk()?;
-            revwalk.set_sorting(git2::Sort::TIME);
-            revwalk.push_head()?;
-            for commit_id in revwalk {
-                let commit_id = commit_id?;
-                let commit = git_repo.find_commit(commit_id)?;
-                let classification =
-                    classifiers
-                        .iter()
-                        .fold(CommitClassification::default(), |sum, x| {
-                            let classification = x.classify(&commit);
-                            CommitClassification {
-                                abort_walk: sum.abort_walk && classification.abort_walk,
-                                include: sum.include && classification.include,
-                            }
-                        });
-                //                let classification = classify(&commit);
-                if classification.include {
-                    let entry = RepoCommit::from(repo.clone(), &commit);
-                    max_width_committer = cmp::max(max_width_committer, entry.committer.len());
-                    commits.push(entry);
+        thread::spawn(move || {
+            progress.join_and_clear().unwrap();
+        });
+
+        let mut commits: Vec<RepoCommit> = repos
+            .par_iter()
+            .progress_with(overall_progress)
+            .filter_map(move |repo| {
+                let progress_bar = &progress_bars[rayon::current_thread_index()?];
+                progress_bar.set_message(&format!("Scanning {}", repo.rel_path));
+
+                let progress_error = |msg: &str, error: &dyn std::error::Error| {
+                    progress_bar.println(format!(
+                        "{}: {}: {}",
+                        style(&repo.rel_path).cyan(),
+                        style(&msg).red(),
+                        error
+                    ));
+                    progress_bar.inc(1);
+                    progress_bar.set_message("Idle");
+                };
+
+                let git_repo = Repository::open(&repo.abs_path)
+                    .map_err(|e| progress_error("Failed to open", &e))
+                    .ok()?;
+
+                let mut revwalk = git_repo
+                    .revwalk()
+                    .map_err(|e| progress_error("Failed create revwalk", &e))
+                    .ok()?;
+                revwalk.set_sorting(git2::Sort::TIME);
+
+                revwalk
+                    .push_head()
+                    .map_err(|e| progress_error("Failed query history", &e))
+                    .ok()?;
+
+                let mut commits = Vec::new();
+                for commit_id in revwalk {
+                    let commit = commit_id
+                        .and_then(|commit_id| git_repo.find_commit(commit_id))
+                        .map_err(|e| progress_error("Failed find commit", &e))
+                        .ok()?;
+                    let (include, abort) = classifier.classify(&commit);
+                    if include {
+                        commits.push(RepoCommit::from(repo.clone(), &commit));
+                    }
+                    if abort {
+                        break;
+                    }
                 }
-                if classification.abort_walk {
-                    break;
-                }
-            }
-            progress.inc(1);
-        }
+                progress_bar.set_message("Idle");
+                Some(commits)
+            })
+            .flatten()
+            .collect();
+
+        let max_width_repo = repos.iter().map(|r| r.description.len()).max().unwrap_or(0);
+        let max_width_committer = commits.iter().map(|c| c.committer.len()).max().unwrap_or(0);
+
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
         Ok(MultiRepoHistory {
             repos,
@@ -99,7 +143,7 @@ impl Repo {
 /// with a local git repository
 #[derive(Clone)]
 pub struct RepoCommit {
-    pub repo: Rc<Repo>,
+    pub repo: Arc<Repo>,
     pub timestamp: Time,
     pub summary: String,
     pub author: String,
@@ -109,7 +153,7 @@ pub struct RepoCommit {
 }
 
 impl RepoCommit {
-    pub fn from(repo: Rc<Repo>, commit: &Commit) -> RepoCommit {
+    pub fn from(repo: Arc<Repo>, commit: &Commit) -> RepoCommit {
         let timestamp = commit.time();
         let summary = commit.summary().unwrap_or("None");
         let author = commit.author().name().unwrap_or("None").into();
@@ -181,58 +225,39 @@ impl fmt::Debug for RepoCommit {
     }
 }
 
-pub struct CommitClassification {
-    pub include: bool,
-    pub abort_walk: bool,
+pub struct Classifier<'a> {
+    age: u32,
+    author: Option<&'a str>,
+    message: Option<String>,
 }
 
-impl CommitClassification {
-    pub fn default() -> Self {
-        Self {
-            include: true,
-            abort_walk: false,
+impl<'a> Classifier<'a> {
+    pub fn new(age: u32, author: Option<&'a str>, message: Option<&'a str>) -> Classifier<'a> {
+        Classifier {
+            age,
+            author,
+            message: message.map(str::to_lowercase),
         }
     }
 }
 
-pub trait CommitClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification;
-}
-
-pub struct AgeClassifier(pub usize);
-
-impl CommitClassifier for AgeClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification {
+impl<'a> Classifier<'a> {
+    fn classify(&self, commit: &Commit) -> (bool, bool) {
         let utc = as_datetime_utc(&commit.time());
         let diff = chrono::Utc::now().signed_duration_since(utc);
-        let include = diff.num_days() <= self.0 as i64;
-        CommitClassification {
-            include,
-            abort_walk: !include,
+        let include = diff.num_days() as u32 <= self.age;
+        let (mut include, abort) = (include, !include);
+
+        if let Some(ref message) = self.message {
+            let cm = commit.message().unwrap_or("").to_ascii_lowercase();
+            include &= cm.contains(message);
         }
-    }
-}
 
-pub struct AuthorClassifier(pub String);
-
-impl CommitClassifier for AuthorClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification {
-        let author = commit.author().name().unwrap_or("").to_ascii_lowercase();
-        CommitClassification {
-            include: author.contains(&self.0.to_lowercase()),
-            abort_walk: false,
+        if let Some(ref author) = self.author {
+            let ca = commit.author().name().unwrap_or("").to_ascii_lowercase();
+            include &= ca.contains(author);
         }
-    }
-}
 
-pub struct MessageClassifier(pub String);
-
-impl CommitClassifier for MessageClassifier {
-    fn classify(&self, commit: &Commit) -> CommitClassification {
-        let author = commit.message().unwrap_or("").to_ascii_lowercase();
-        CommitClassification {
-            include: author.contains(&self.0.to_lowercase()),
-            abort_walk: false,
-        }
+        (include, abort)
     }
 }

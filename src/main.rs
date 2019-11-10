@@ -5,9 +5,9 @@ extern crate indicatif;
 extern crate num_cpus;
 
 mod model;
-mod table_view;
 mod ui;
 mod utils;
+mod views;
 
 use clap::{App, Arg};
 use model::{MultiRepoHistory, Repo};

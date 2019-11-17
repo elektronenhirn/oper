@@ -1,7 +1,6 @@
 use crate::cursive::traits::View;
 use crate::model::{MultiRepoHistory, RepoCommit};
-use crate::views::DiffView;
-use crate::views::MainView;
+use crate::views::{DiffView, MainView, SeperatorView};
 use cursive::event::{Event, Key};
 use cursive::theme::ColorStyle;
 use cursive::traits::Boxable;
@@ -45,7 +44,6 @@ pub fn show(model: MultiRepoHistory) {
     ));
 
     let mut main_view = MainView::from(model);
-    let mut hideable_diff_view = HideableView::new(DiffView::empty().with_id("diffView"));
 
     siv.load_toml(include_str!("../assets/style.toml")).unwrap();
 
@@ -58,33 +56,33 @@ pub fn show(model: MultiRepoHistory) {
         },
     );
     let landscape_format = screen_size.x / (screen_size.y * 3) >= 1;
-    hideable_diff_view.hide(); //diff view is hidden per default
     let layout = if landscape_format {
         LinearLayout::vertical()
             .child(
                 LinearLayout::horizontal()
                     .child(main_view.with_id("mainView").full_screen())
-                    .child(hideable_diff_view.with_id("diffViewHideable")),
+                    .child(HideableView::new(SeperatorView::vertical()).hidden().with_id("sepView"))
+                    .child(HideableView::new(DiffView::empty().with_id("diffView")).hidden().with_id("diffViewHideable")),
             )
             .child(build_status_bar(status_bar))
     } else {
         LinearLayout::vertical()
             .child(main_view.with_id("mainView").full_screen())
-            .weight(1)
-            .child(hideable_diff_view.with_id("diffViewHideable"))
-            .weight(1)
+            .child(HideableView::new(DiffView::empty().with_id("diffView")).hidden().with_id("diffViewHideable"))
             .child(build_status_bar(status_bar))
-            .weight(1)
     };
 
     siv.add_layer(layout);
     siv.add_global_callback(Key::Enter, |s| {
-        let mut view: ViewRef<HideableView<IdView<DiffView>>> =
+        let mut diff_view: ViewRef<HideableView<IdView<DiffView>>> =
             s.find_id("diffViewHideable").unwrap();
-        if view.is_visible() {
-            view.hide()
+        let sep_view: Option<ViewRef<HideableView<SeperatorView>>> = s.find_id("sepView");
+        if diff_view.is_visible() {
+            diff_view.hide();
+            sep_view.map(|mut v| {v.hide()});
         } else {
-            view.unhide()
+            diff_view.unhide();
+            sep_view.map(|mut v| {v.unhide()});
         };
     });
     siv.add_global_callback('q', |s| {

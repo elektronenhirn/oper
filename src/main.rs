@@ -2,6 +2,7 @@
 extern crate clap;
 extern crate cursive;
 extern crate indicatif;
+extern crate num_cpus;
 
 mod model;
 mod table_view;
@@ -19,6 +20,8 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 use utils::{find_project_file, find_repo_base_folder};
+
+const MAX_NUMBER_OF_THREADS: usize = 18; //tests on a 36 core INTEL Xeon showed that parsing becomes slower again if more than 18 threads are used
 
 fn main() -> Result<(), String> {
     let original_cwd = env::current_dir().expect("cwd not found");
@@ -77,6 +80,11 @@ fn main() -> Result<(), String> {
 
 fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> {
     env::set_current_dir(cwd)?;
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(std::cmp::min(num_cpus::get(), MAX_NUMBER_OF_THREADS))
+        .build_global()
+        .unwrap();
+
     let project_file = File::open(find_project_file()?)?;
     let repos = repos_from(&project_file)?;
 

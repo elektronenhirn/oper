@@ -67,8 +67,8 @@ fn main() -> Result<(), String> {
     let days = value_t!(matches.value_of("days"), u32).unwrap_or_else(|e| e.exit());
     let classifier = model::Classifier::new(
         days,
-        matches.value_of("message"),
         matches.value_of("author"),
+        matches.value_of("message"),
     );
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 

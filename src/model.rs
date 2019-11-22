@@ -225,23 +225,23 @@ impl fmt::Debug for RepoCommit {
     }
 }
 
-pub struct Classifier<'a> {
+pub struct Classifier {
     age: u32,
-    author: Option<&'a str>,
+    author: Option<String>,
     message: Option<String>,
 }
 
-impl<'a> Classifier<'a> {
-    pub fn new(age: u32, author: Option<&'a str>, message: Option<&'a str>) -> Classifier<'a> {
+impl Classifier {
+    pub fn new(age: u32, author: Option<&str>, message: Option<&str>) -> Classifier {
         Classifier {
             age,
-            author,
+            author: author.map(str::to_lowercase),
             message: message.map(str::to_lowercase),
         }
     }
 }
 
-impl<'a> Classifier<'a> {
+impl Classifier {
     fn classify(&self, commit: &Commit) -> (bool, bool) {
         let utc = as_datetime_utc(&commit.time());
         let diff = chrono::Utc::now().signed_duration_since(utc);

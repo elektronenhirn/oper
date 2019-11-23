@@ -61,14 +61,26 @@ pub fn show(model: MultiRepoHistory) {
             .child(
                 LinearLayout::horizontal()
                     .child(main_view.with_id("mainView").full_screen())
-                    .child(HideableView::new(SeperatorView::vertical()).hidden().with_id("sepView"))
-                    .child(HideableView::new(DiffView::empty().with_id("diffView")).hidden().with_id("diffViewHideable")),
+                    .child(
+                        HideableView::new(SeperatorView::vertical())
+                            .hidden()
+                            .with_id("sepView"),
+                    )
+                    .child(
+                        HideableView::new(DiffView::empty().with_id("diffView"))
+                            .hidden()
+                            .with_id("diffViewHideable"),
+                    ),
             )
             .child(build_status_bar(status_bar))
     } else {
         LinearLayout::vertical()
             .child(main_view.with_id("mainView").full_screen())
-            .child(HideableView::new(DiffView::empty().with_id("diffView")).hidden().with_id("diffViewHideable"))
+            .child(
+                HideableView::new(DiffView::empty().with_id("diffView"))
+                    .hidden()
+                    .with_id("diffViewHideable"),
+            )
             .child(build_status_bar(status_bar))
     };
 
@@ -79,10 +91,10 @@ pub fn show(model: MultiRepoHistory) {
         let sep_view: Option<ViewRef<HideableView<SeperatorView>>> = s.find_id("sepView");
         if diff_view.is_visible() {
             diff_view.hide();
-            sep_view.map(|mut v| {v.hide()});
+            sep_view.map(|mut v| v.hide());
         } else {
             diff_view.unhide();
-            sep_view.map(|mut v| {v.unhide()});
+            sep_view.map(|mut v| v.unhide());
         };
     });
     siv.add_global_callback('q', |s| {

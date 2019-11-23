@@ -1,7 +1,7 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
 use console::style;
-use git2::{Commit, DiffFormat, Oid, Repository, Time};
+use git2::{Commit, Diff, DiffFormat, Oid, Repository, Time};
 use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::fmt;
@@ -188,27 +188,36 @@ impl RepoCommit {
         )
     }
 
-    pub fn diff(&self) -> Result<String, git2::Error> {
-        let git_repo = Repository::open(&self.repo.abs_path)?;
-        let commit = git_repo.find_commit(self.commit_id)?;
+    pub fn diff(&self) -> Vec<(char, String)> {
+        let git_repo = Repository::open(&self.repo.abs_path).expect("Failed to open git repo");
+        let commit = git_repo
+            .find_commit(self.commit_id)
+            .expect("Failed to find commit");
         let a = if commit.parents().len() == 1 {
-            let parent = commit.parent(0)?;
-            Some(parent.tree()?)
+            let parent = commit.parent(0).expect("Failed to find parent");
+            Some(parent.tree().expect(""))
         } else {
             None
         };
-        let b = commit.tree()?;
-        let diff = git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None)?;
-        let mut as_text = String::default();
+        let b = commit.tree().expect("Failed to open commit");
+        let lines = match git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None) {
+            Ok(diff) => Self::diff_to_vec(diff),
+            Err(_) => Vec::new(),
+        };
+        lines
+    }
+
+    fn diff_to_vec(diff: Diff<'_>) -> Vec<(char, String)> {
+        let mut lines = Vec::new();
         diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
-            match line.origin() {
-                ' ' | '+' | '-' => as_text += &line.origin().to_string(),
-                _ => {}
-            }
-            as_text += std::str::from_utf8(line.content()).unwrap();
+            lines.push((
+                line.origin(),
+                std::str::from_utf8(line.content()).unwrap().to_string(),
+            ));
             true
-        })?;
-        Ok(as_text)
+        })
+        .unwrap();
+        lines
     }
 }
 

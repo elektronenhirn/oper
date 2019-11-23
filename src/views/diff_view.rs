@@ -4,7 +4,7 @@ use cursive::traits::Finder;
 use cursive::traits::Identifiable;
 use cursive::utils::span::SpannedString;
 use cursive::view::ViewWrapper;
-use cursive::views::{ScrollView, IdView, TextView, ViewRef};
+use cursive::views::{IdView, ScrollView, TextView, ViewRef};
 
 pub struct DiffView {
     scroll_view: ScrollView<IdView<TextView>>,
@@ -18,23 +18,39 @@ impl DiffView {
     }
 
     #[rustfmt::skip]
-  pub fn set_commit(self: &mut Self, entry: &RepoCommit){
-    let mut text = SpannedString::<Style>::plain("");
+    pub fn set_commit(self: &mut Self, entry: &RepoCommit) {
+        let mut text = SpannedString::<Style>::plain("");
 
-    text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
-    text.append_styled(format!("Id:         {}\n", entry.commit_id),     ColorStyle::primary());
-    text.append_styled(format!("Author:     {}\n", entry.author),        ColorStyle::tertiary() );
-    text.append_styled(format!("Commit:     {}\n", entry.committer),     ColorStyle::tertiary() );
-    text.append_styled(format!("CommitDate: {}\n", entry.time_as_str()), ColorStyle::secondary() );
-    text.append("\n");
+        text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
+        text.append_styled(format!("Id:         {}\n", entry.commit_id),     ColorStyle::primary());
+        text.append_styled(format!("Author:     {}\n", entry.author),        ColorStyle::tertiary() );
+        text.append_styled(format!("Commit:     {}\n", entry.committer),     ColorStyle::tertiary() );
+        text.append_styled(format!("CommitDate: {}\n", entry.time_as_str()), ColorStyle::secondary() );
+        text.append("\n");
 
-    text.append(&entry.message);
-    text.append("---\n");
-    text.append(&entry.diff().unwrap_or_else(|_| "<no diff>".to_string()));
+        text.append(&entry.message);
+        text.append("---\n");
 
-    let mut text_view: ViewRef<TextView> = self.scroll_view.find_id("diff").unwrap();
-    text_view.set_content(text);
-  }
+        for (sigil, line) in &entry.diff() {
+            let combined = match sigil {
+                ' ' | '+' | '-' => sigil.to_string() + line,
+                _ => line.to_string(),
+            };
+            text.append_styled(combined, Self::style_of(*sigil));
+        }
+
+        let mut text_view: ViewRef<TextView> = self.scroll_view.find_id("diff").unwrap();
+        text_view.set_content(text);
+    }
+
+    fn style_of(sigil: char) -> ColorStyle {
+        match sigil {
+            ' ' => ColorStyle::primary(),
+            '+' => ColorStyle::tertiary(),
+            '-' => ColorStyle::secondary(),
+            _ => ColorStyle::primary(),
+        }
+    }
 }
 
 impl ViewWrapper for DiffView {

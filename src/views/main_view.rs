@@ -75,6 +75,17 @@ impl MainView {
         });
     }
 
+    pub fn current_commit(&mut self) -> Option<RepoCommit> {
+        let mut table: ViewRef<TableView<RepoCommit, Column>> =
+            self.layout.find_id("table").unwrap();
+
+        table.row().map_or(None, |row| {
+            table
+                .borrow_item(row)
+                .map_or(None, |commit| Some(commit.clone()))
+        })
+    }
+
     fn new_table(model: MultiRepoHistory) -> TableView<RepoCommit, Column> {
         let mut table = TableView::<RepoCommit, Column>::new()
             .column(Column::CommitDateTime, "Commit", |c| c.width(22))

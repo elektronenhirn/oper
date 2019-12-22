@@ -21,7 +21,8 @@ fn build_status_bar(model: Rc<String>) -> impl cursive::view::View {
 
 fn update(siv: &mut Cursive, index: usize, commits: usize, entry: &RepoCommit) {
     let mut diff_view: ViewRef<DiffView> = siv.find_id("diffView").unwrap();
-    diff_view.set_commit(&entry);
+    diff_view.set_commit(&entry, false);
+
     let mut main_view: ViewRef<MainView> = siv.find_id("mainView").unwrap();
     main_view.update_commit_bar(index, commits, &entry);
 }
@@ -50,7 +51,7 @@ pub fn show(model: MultiRepoHistory) {
     main_view.set_on_select(
         move |siv: &mut Cursive, _row: usize, index: usize, entry: &RepoCommit| {
             let mut diff_view: ViewRef<DiffView> = siv.find_id("diffView").unwrap();
-            diff_view.set_commit(&entry);
+            diff_view.set_commit(&entry, false);
             let mut main_view: ViewRef<MainView> = siv.find_id("mainView").unwrap();
             main_view.update_commit_bar(index, commits, &entry);
         },
@@ -110,6 +111,12 @@ pub fn show(model: MultiRepoHistory) {
     siv.add_global_callback('j', |s| {
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
         diff_view.on_event(Event::Key(Key::Down));
+    });
+    siv.add_global_callback('d', |s| {
+        let mut main_view: ViewRef<MainView> = s.find_id("mainView").unwrap();
+        let commit = main_view.current_commit();
+        let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
+        commit.map(|c| diff_view.set_commit(&c, true));
     });
 
     first_commit.map(|commit| update(&mut siv, 0, commits, &commit));

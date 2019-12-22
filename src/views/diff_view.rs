@@ -18,7 +18,7 @@ impl DiffView {
     }
 
     #[rustfmt::skip]
-    pub fn set_commit(self: &mut Self, entry: &RepoCommit) {
+    pub fn set_commit(self: &mut Self, entry: &RepoCommit, show_diff: bool) {
         let mut text = SpannedString::<Style>::plain("");
 
         text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
@@ -31,12 +31,14 @@ impl DiffView {
         text.append(&entry.message);
         text.append("---\n");
 
-        for (sigil, line) in &entry.diff() {
-            let combined = match sigil {
-                ' ' | '+' | '-' => sigil.to_string() + line,
-                _ => line.to_string(),
-            };
-            text.append_styled(combined, Self::style_of(*sigil));
+        if show_diff {
+            for (sigil, line) in &entry.diff() {
+                let combined = match sigil {
+                    ' ' | '+' | '-' => sigil.to_string() + line,
+                    _ => line.to_string(),
+                };
+                text.append_styled(combined, Self::style_of(*sigil));
+            }
         }
 
         let mut text_view: ViewRef<TextView> = self.scroll_view.find_id("diff").unwrap();

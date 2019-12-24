@@ -6,7 +6,7 @@ use cursive::theme::ColorStyle;
 use cursive::traits::Boxable;
 use cursive::traits::Identifiable;
 use cursive::views::{Canvas, LayerPosition, LinearLayout};
-use cursive::views::{HideableView, IdView, ViewRef};
+use cursive::views::{ViewRef, BoxView};
 use cursive::Cursive;
 use std::default::Default;
 use std::rc::Rc;
@@ -62,42 +62,18 @@ pub fn show(model: MultiRepoHistory) {
             .child(
                 LinearLayout::horizontal()
                     .child(main_view.with_id("mainView").full_screen())
-                    .child(
-                        HideableView::new(SeperatorView::vertical())
-                            .hidden()
-                            .with_id("sepView"),
-                    )
-                    .child(
-                        HideableView::new(DiffView::empty().with_id("diffView"))
-                            .hidden()
-                            .with_id("diffViewHideable"),
-                    ),
+                    .child(SeperatorView::vertical())
+                    .child(BoxView::with_fixed_width(screen_size.x / 2 - 1, DiffView::empty().with_id("diffView")))
             )
             .child(build_status_bar(status_bar))
     } else {
         LinearLayout::vertical()
             .child(main_view.with_id("mainView").full_screen())
-            .child(
-                HideableView::new(DiffView::empty().with_id("diffView"))
-                    .hidden()
-                    .with_id("diffViewHideable"),
-            )
+            .child(BoxView::with_fixed_height(screen_size.y / 2 - 1, DiffView::empty().with_id("diffView")))
             .child(build_status_bar(status_bar))
     };
 
     siv.add_layer(layout);
-    siv.add_global_callback(Key::Enter, |s| {
-        let mut diff_view: ViewRef<HideableView<IdView<DiffView>>> =
-            s.find_id("diffViewHideable").unwrap();
-        let sep_view: Option<ViewRef<HideableView<SeperatorView>>> = s.find_id("sepView");
-        if diff_view.is_visible() {
-            diff_view.hide();
-            sep_view.map(|mut v| v.hide());
-        } else {
-            diff_view.unhide();
-            sep_view.map(|mut v| v.unhide());
-        };
-    });
     siv.add_global_callback('q', |s| {
         s.pop_layer();
         if s.screen().get(LayerPosition::FromBack(0)).is_none() {
@@ -112,7 +88,7 @@ pub fn show(model: MultiRepoHistory) {
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
         diff_view.on_event(Event::Key(Key::Down));
     });
-    siv.add_global_callback('d', |s| {
+    siv.add_global_callback(Key::Enter, |s| {
         let mut main_view: ViewRef<MainView> = s.find_id("mainView").unwrap();
         let commit = main_view.current_commit();
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();

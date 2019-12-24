@@ -37,8 +37,10 @@ impl DiffView {
                     ' ' | '+' | '-' => sigil.to_string() + line,
                     _ => line.to_string(),
                 };
-                text.append_styled(combined, Self::style_of(*sigil));
+                text.append_styled(combined, Self::style_of(*sigil), );
             }
+        } else {
+            text.append_styled("\nPress <ENTER> to load diff", ColorStyle::tertiary());
         }
 
         let mut text_view: ViewRef<TextView> = self.scroll_view.find_id("diff").unwrap();

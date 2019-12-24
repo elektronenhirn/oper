@@ -2,19 +2,33 @@ use crate::cursive::traits::View;
 use crate::model::{MultiRepoHistory, RepoCommit};
 use crate::views::{DiffView, MainView, SeperatorView};
 use cursive::event::{Event, Key};
-use cursive::theme::ColorStyle;
+use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::Boxable;
 use cursive::traits::Identifiable;
+use cursive::views::{BoxView, ViewRef};
 use cursive::views::{Canvas, LayerPosition, LinearLayout};
-use cursive::views::{ViewRef, BoxView};
 use cursive::Cursive;
+use cursive::XY;
 use std::default::Default;
-use std::rc::Rc;
 
-fn build_status_bar(model: Rc<String>) -> impl cursive::view::View {
-    Canvas::new(model)
-        .with_draw(|model, printer| {
-            printer.with_style(ColorStyle::tertiary(), |p| p.print((0, 0), &model))
+fn build_status_bar(commits: usize, repos: usize, size: XY<usize>) -> impl cursive::view::View {
+    Canvas::new((commits, repos, size))
+        .with_draw(|(commits, repos, size), printer| {
+            let style = ColorStyle::new(
+                Color::Dark(BaseColor::Black),
+                Color::Light(BaseColor::Black),
+            );
+
+            printer.with_style(style, |p| {
+                let text_left = format!("Found {} commits across {} repositories", commits, repos);
+                let text_right = format!(" [{}x{}]", size.x, size.y);
+                p.print((0, 0), &text_left);
+                let gap: i32 = p.size.x as i32 - text_left.len() as i32 - text_right.len() as i32;
+                if gap > 0 {
+                    p.print_hline((text_left.len(), 0), gap as usize, " ");
+                    p.print((text_left.len() + gap as usize, 0), &text_right);
+                }
+            });
         })
         .with_required_size(|_model, req| cursive::Vec2::new(req.x, 1))
 }
@@ -39,11 +53,6 @@ pub fn show(model: MultiRepoHistory) {
     let mut siv = Cursive::default();
     let screen_size = siv.screen_size();
 
-    let status_bar = Rc::new(format!(
-        "Found {} commits across {} repositories - [{}x{}]",
-        commits, repos, screen_size.x, screen_size.y
-    ));
-
     let mut main_view = MainView::from(model);
 
     siv.load_toml(include_str!("../assets/style.toml")).unwrap();
@@ -63,14 +72,20 @@ pub fn show(model: MultiRepoHistory) {
                 LinearLayout::horizontal()
                     .child(main_view.with_id("mainView").full_screen())
                     .child(SeperatorView::vertical())
-                    .child(BoxView::with_fixed_width(screen_size.x / 2 - 1, DiffView::empty().with_id("diffView")))
+                    .child(BoxView::with_fixed_width(
+                        screen_size.x / 2 - 1,
+                        DiffView::empty().with_id("diffView"),
+                    )),
             )
-            .child(build_status_bar(status_bar))
+            .child(build_status_bar(commits, repos, screen_size))
     } else {
         LinearLayout::vertical()
             .child(main_view.with_id("mainView").full_screen())
-            .child(BoxView::with_fixed_height(screen_size.y / 2 - 1, DiffView::empty().with_id("diffView")))
-            .child(build_status_bar(status_bar))
+            .child(BoxView::with_fixed_height(
+                screen_size.y / 2 - 1,
+                DiffView::empty().with_id("diffView"),
+            ))
+            .child(build_status_bar(commits, repos, screen_size))
     };
 
     siv.add_layer(layout);

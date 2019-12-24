@@ -212,7 +212,7 @@ impl RepoCommit {
         diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
             lines.push((
                 line.origin(),
-                std::str::from_utf8(line.content()).unwrap().to_string(),
+                std::str::from_utf8(line.content()).unwrap_or("<no utf8>").to_string(),
             ));
             true
         })

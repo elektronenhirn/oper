@@ -113,7 +113,9 @@ impl MainView {
                 printer.with_style(style, |p| {
                     let text = (*(*model).borrow()).clone();
                     p.print((0, 0), &text);
-                    p.print_hline((text.len(), 0), p.size.x - text.len(), " ");
+                    if p.size.x > text.len() {
+                        p.print_hline((text.len(), 0), p.size.x - text.len(), " ");
+                    }
                 });
             })
             .with_required_size(|_model, req| cursive::Vec2::new(req.x, 1))

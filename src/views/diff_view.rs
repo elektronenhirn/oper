@@ -1,4 +1,5 @@
 use crate::model::RepoCommit;
+use crate::styles::{BLUE, GREEN, LIGHT_BLUE, MAGENTA, RED, WHITE, YELLOW};
 use cursive::theme::{ColorStyle, Style};
 use cursive::traits::Finder;
 use cursive::traits::Identifiable;
@@ -21,20 +22,23 @@ impl DiffView {
     pub fn set_commit(self: &mut Self, entry: &RepoCommit, show_diff: bool) {
         let mut text = SpannedString::<Style>::plain("");
 
-        text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), ColorStyle::primary() );
-        text.append_styled(format!("Id:         {}\n", entry.commit_id),     ColorStyle::primary());
-        text.append_styled(format!("Author:     {}\n", entry.author),        ColorStyle::tertiary() );
-        text.append_styled(format!("Commit:     {}\n", entry.committer),     ColorStyle::tertiary() );
-        text.append_styled(format!("CommitDate: {}\n", entry.time_as_str()), ColorStyle::secondary() );
+        text.append_styled(format!("Repo:       {}\n", entry.repo.rel_path), *RED);
+        text.append_styled(format!("Id:         {}\n", entry.commit_id), *BLUE);
+        text.append_styled(format!("Author:     {}\n", entry.author), *LIGHT_BLUE );
+        text.append_styled(format!("Commit:     {}\n", entry.committer), *GREEN);
+        text.append_styled(format!("CommitDate: {}\n", entry.time_as_str()), *BLUE );
         text.append("\n");
 
-        text.append(&entry.message);
-        text.append("---\n");
+        text.append_styled(&entry.message, *WHITE);
+        text.append("\n---\n");
 
         if show_diff {
-            for (sigil, line) in &entry.diff() {
+            let diff = entry.diff();
+
+            for (sigil, line) in &diff {
                 let combined = match sigil {
                     ' ' | '+' | '-' => sigil.to_string() + line,
+                    'F' => "\n".to_string() + line,
                     _ => line.to_string(),
                 };
                 text.append_styled(combined, Self::style_of(*sigil), );
@@ -49,10 +53,12 @@ impl DiffView {
 
     fn style_of(sigil: char) -> ColorStyle {
         match sigil {
-            ' ' => ColorStyle::primary(),
-            '+' => ColorStyle::tertiary(),
-            '-' => ColorStyle::secondary(),
-            _ => ColorStyle::primary(),
+            ' ' => *BLUE,
+            '+' => *GREEN,
+            '-' => *RED,
+            'F' => *YELLOW,
+            'H' => *MAGENTA,
+            _ => *BLUE,
         }
     }
 }

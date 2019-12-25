@@ -1,5 +1,6 @@
 use crate::model::{MultiRepoHistory, RepoCommit};
 use crate::views::table_view::{TableView, TableViewItem};
+use crate::styles::{GREEN, RED, WHITE};
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::*;
 use cursive::view::ViewWrapper;
@@ -8,6 +9,11 @@ use cursive::Cursive;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
+
+const COLUMN_WIDTH_COMMIT_DATE : usize = 22;
+const COLUMN_WIDTH_REPO_NAME : usize = 15;
+const COLUMN_WIDTH_COMITTER : usize = 17;
+const COLUMN_WIDTH_SUBJECT : usize = 50;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum Column {
@@ -88,16 +94,15 @@ impl MainView {
 
     fn new_table(model: MultiRepoHistory) -> TableView<RepoCommit, Column> {
         let mut table = TableView::<RepoCommit, Column>::new()
-            .column(Column::CommitDateTime, "Commit", |c| c.width(22))
+            .column(Column::CommitDateTime, "Commit", |c| c.width(COLUMN_WIDTH_COMMIT_DATE))
             .column(Column::Repo, "Repo", |c| {
-                c.width(model.max_width_repo).color(ColorStyle::secondary())
+                c.width(COLUMN_WIDTH_REPO_NAME).color(*RED)
             })
             .column(Column::Comitter, "Committer", |c| {
-                c.width(model.max_width_committer)
-                    .color(ColorStyle::tertiary())
+                c.width(COLUMN_WIDTH_COMITTER).color(*GREEN)
             })
             .column(Column::Summary, "Summary", |c| {
-                c.color(ColorStyle::tertiary())
+                c.width(COLUMN_WIDTH_SUBJECT).color(*WHITE)
             });
         table.set_items(model.commits);
         table.set_selected_row(0);

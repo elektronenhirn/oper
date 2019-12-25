@@ -16,6 +16,7 @@ console = "0.9.0"
 cursive = "0.12"
 git2 = "0.9.1"
 indicatif = { version = "0.12.0", features = ["with_rayon"] }
+lazy_static = "1.4.0"
 log = "0.4.7"
 rayon = "1.2.0"
 simple_logger = "1.3.0"

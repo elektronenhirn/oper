@@ -938,9 +938,9 @@ impl<H: Copy + Clone + 'static> TableColumn<H> {
 
     fn draw_row(&self, focused: bool, printer: &Printer, value: &str) {
         let value = match self.alignment {
-            HAlign::Left => format!("{:<width$} ", value, width = self.width),
-            HAlign::Right => format!("{:>width$} ", value, width = self.width),
-            HAlign::Center => format!("{:^width$} ", value, width = self.width),
+            HAlign::Left => format!("{:<width$.N$} ", value, width = self.width, N = self.width),
+            HAlign::Right => format!("{:>width$.N$} ", value, width = self.width, N = self.width),
+            HAlign::Center => format!("{:^width$.N$} ", value, width = self.width, N = self.width),
         };
         printer.with_color(
             if focused {

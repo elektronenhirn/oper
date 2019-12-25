@@ -13,8 +13,6 @@ use std::thread;
 pub struct MultiRepoHistory {
     pub repos: Vec<Arc<Repo>>,
     pub commits: Vec<RepoCommit>,
-    pub max_width_repo: usize,
-    pub max_width_committer: usize,
 }
 
 impl MultiRepoHistory {
@@ -98,15 +96,10 @@ impl MultiRepoHistory {
             .flatten()
             .collect();
 
-        let max_width_repo = repos.iter().map(|r| r.description.len()).max().unwrap_or(0);
-        let max_width_committer = commits.iter().map(|c| c.committer.len()).max().unwrap_or(0);
-
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
         Ok(MultiRepoHistory {
             repos,
             commits,
-            max_width_repo,
-            max_width_committer,
         })
     }
 }

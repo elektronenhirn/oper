@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Install ncurses
-      run: sudo apt-get install libncurses5-dev 
+      run: sudo apt-get install libncurses5-dev libncursesw5-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests

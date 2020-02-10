@@ -23,5 +23,4 @@ cargo install oper
 
 - Define the number of days to include in the history with the _--days_ cli switch
 - Filter commits by using the _--author_ or _--message_ cli switches
-- Press Enter on any change in the list to load the diff
 - Quit oper by pressing _q_

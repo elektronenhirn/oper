@@ -1,6 +1,6 @@
 use crate::model::{MultiRepoHistory, RepoCommit};
-use crate::views::table_view::{TableView, TableViewItem};
 use crate::styles::{GREEN, RED, WHITE};
+use crate::views::table_view::{TableView, TableViewItem};
 use cursive::theme::{BaseColor, Color, ColorStyle};
 use cursive::traits::*;
 use cursive::view::ViewWrapper;
@@ -10,10 +10,10 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-const COLUMN_WIDTH_COMMIT_DATE : usize = 22;
-const COLUMN_WIDTH_REPO_NAME : usize = 15;
-const COLUMN_WIDTH_COMITTER : usize = 17;
-const COLUMN_WIDTH_SUBJECT : usize = 50;
+const COLUMN_WIDTH_COMMIT_DATE: usize = 22;
+const COLUMN_WIDTH_REPO_NAME: usize = 15;
+const COLUMN_WIDTH_COMITTER: usize = 17;
+const COLUMN_WIDTH_SUBJECT: usize = 70;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 enum Column {
@@ -33,16 +33,11 @@ impl TableViewItem<Column> for RepoCommit {
         }
     }
 
-    fn cmp(&self, other: &Self, column: Column) -> Ordering
+    fn cmp(&self, _other: &Self, _column: Column) -> Ordering
     where
         Self: Sized,
     {
-        match column {
-            Column::CommitDateTime => self.time_as_str().cmp(&other.time_as_str()),
-            Column::Comitter => self.committer.cmp(&other.committer),
-            Column::Repo => self.repo.description.cmp(&other.repo.description),
-            Column::Summary => self.summary.cmp(&other.summary),
-        }
+        Ordering::Equal
     }
 }
 
@@ -81,20 +76,11 @@ impl MainView {
         });
     }
 
-    pub fn current_commit(&mut self) -> Option<RepoCommit> {
-        let mut table: ViewRef<TableView<RepoCommit, Column>> =
-            self.layout.find_id("table").unwrap();
-
-        table.row().map_or(None, |row| {
-            table
-                .borrow_item(row)
-                .map_or(None, |commit| Some(commit.clone()))
-        })
-    }
-
     fn new_table(model: MultiRepoHistory) -> TableView<RepoCommit, Column> {
         let mut table = TableView::<RepoCommit, Column>::new()
-            .column(Column::CommitDateTime, "Commit", |c| c.width(COLUMN_WIDTH_COMMIT_DATE))
+            .column(Column::CommitDateTime, "Commit", |c| {
+                c.width(COLUMN_WIDTH_COMMIT_DATE)
+            })
             .column(Column::Repo, "Repo", |c| {
                 c.width(COLUMN_WIDTH_REPO_NAME).color(*RED)
             })

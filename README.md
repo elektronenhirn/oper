@@ -14,7 +14,7 @@ Oper is inspired by [tig](https://jonas.github.io/tig/), but is far for more bas
 Ubuntu releases are available [here](https://github.com/elektronenhirn/oper/releases/latest). After downloading the package which fits your ubuntu version you can install it with 
 
 ```
-sudo dpkg -i <path-to-deb-file>
+sudo apt install ./<path-to-deb-file>
 ```
 
 ## Other Operating Systems

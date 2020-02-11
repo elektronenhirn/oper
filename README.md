@@ -9,6 +9,16 @@ Oper is inspired by [tig](https://jonas.github.io/tig/), but is far for more bas
 
 # Installation
 
+## Ubuntu
+
+Ubuntu releases are available [here](https://github.com/elektronenhirn/oper/releases/latest). After downloading the package which fits your ubuntu version you can install it with 
+
+```
+sudo dpkg -i <path-to-deb-file>
+```
+
+## Other Operating Systems
+
 Oper is written in rust. You need the rust toolchain installed to be able to use it:
 
 https://www.rust-lang.org/tools/install

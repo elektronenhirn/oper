@@ -3,11 +3,14 @@ extern crate clap;
 extern crate cursive;
 extern crate indicatif;
 extern crate num_cpus;
+#[macro_use]
+extern crate lazy_static;
 
 mod model;
-mod table_view;
+mod styles;
 mod ui;
 mod utils;
+mod views;
 
 use clap::{App, Arg};
 use model::{MultiRepoHistory, Repo};

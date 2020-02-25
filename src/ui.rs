@@ -104,6 +104,8 @@ pub fn show(model: MultiRepoHistory) {
         diff_view.on_event(Event::Key(Key::Down));
     });
 
-    first_commit.map(|commit| update(&mut siv, 0, commits, &commit));
+    if let Some(commit) = first_commit {
+        update(&mut siv, 0, commits, &commit)
+    }
     siv.run();
 }

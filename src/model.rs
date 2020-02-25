@@ -102,7 +102,10 @@ impl MultiRepoHistory {
             .collect();
 
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
-        Ok(MultiRepoHistory { repos, commits })
+        Ok(MultiRepoHistory {
+            repos,
+            commits,
+        })
     }
 }
 
@@ -195,11 +198,9 @@ impl RepoCommit {
             None
         };
         let b = commit.tree().expect("Failed to open commit");
-        let lines = match git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None) {
-            Ok(diff) => Self::diff_to_vec(diff),
-            Err(_) => Vec::new(),
-        };
-        lines
+        git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None)
+            .map(Self::diff_to_vec)
+            .unwrap_or_default()
     }
 
     fn diff_to_vec(diff: Diff<'_>) -> Vec<(char, String)> {

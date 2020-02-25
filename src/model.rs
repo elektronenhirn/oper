@@ -45,16 +45,15 @@ impl MultiRepoHistory {
 
         let mut commits: Vec<RepoCommit> = repos
             .par_iter()
-            .progress_with(overall_progress)
-            .filter_map(move |repo| {
+            .map(move |repo| {
                 let progress_bar = &progress_bars[rayon::current_thread_index()?];
                 progress_bar.set_message(&format!("Scanning {}", repo.rel_path));
 
                 let progress_error = |msg: &str, error: &dyn std::error::Error| {
                     progress_bar.println(format!(
                         "{}: {}: {}",
-                        style(&repo.rel_path).cyan(),
                         style(&msg).red(),
+                        style(&repo.rel_path).blue(),
                         error
                     ));
                     progress_bar.inc(1);
@@ -80,7 +79,7 @@ impl MultiRepoHistory {
                 for commit_id in revwalk {
                     let commit = commit_id
                         .and_then(|commit_id| git_repo.find_commit(commit_id))
-                        .map_err(|e| progress_error("Failed find commit", &e))
+                        .map_err(|e| progress_error("Failed to find commit", &e))
                         .ok()?;
                     let (include, abort) = classifier.classify(&commit);
                     if include {
@@ -91,16 +90,19 @@ impl MultiRepoHistory {
                     }
                 }
                 progress_bar.set_message("Idle");
-                Some(commits)
+                if commits.is_empty() {
+                    None
+                } else {
+                    Some(commits)
+                }
             })
+            .progress_with(overall_progress)
+            .filter_map(|x| x)
             .flatten()
             .collect();
 
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
-        Ok(MultiRepoHistory {
-            repos,
-            commits,
-        })
+        Ok(MultiRepoHistory { repos, commits })
     }
 }
 

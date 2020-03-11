@@ -74,7 +74,6 @@ type IndexCallback = Rc<dyn Fn(&mut Cursive, usize, usize)>;
 /// # use std::cmp::Ordering;
 /// # use cursive_table_view::{TableView, TableViewItem};
 /// # use cursive::align::HAlign;
-/// # fn main() {
 /// // Provide a type for the table's columns
 /// #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 /// enum BasicColumn {
@@ -119,7 +118,6 @@ type IndexCallback = Rc<dyn Fn(&mut Cursive, usize, usize)>;
 ///                          c.ordering(Ordering::Greater).align(HAlign::Right).width(20)
 ///                      })
 ///                      .default_column(BasicColumn::Name);
-/// # }
 /// ```
 pub struct TableView<T: TableViewItem<H>, H: Eq + Hash + Copy + Clone + 'static> {
     enabled: bool,

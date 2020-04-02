@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "oper"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",

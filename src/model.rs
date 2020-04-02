@@ -68,12 +68,14 @@ impl MultiRepoHistory {
                     .revwalk()
                     .map_err(|e| progress_error("Failed create revwalk", &e))
                     .ok()?;
-                revwalk.set_sorting(git2::Sort::TIME);
 
                 revwalk
                     .push_head()
                     .map_err(|e| progress_error("Failed query history", &e))
                     .ok()?;
+                revwalk.simplify_first_parent();
+                revwalk.set_sorting(git2::Sort::TIME);
+
 
                 let mut commits = Vec::new();
                 for commit_id in revwalk {

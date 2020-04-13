@@ -6,17 +6,21 @@ use cursive::view::ViewWrapper;
 
 pub struct DiffView {
     list_view: ListView,
+    commit: Option<RepoCommit>
 }
 
 impl DiffView {
     pub fn empty() -> Self {
         DiffView {
             list_view: ListView::new(),
+            commit: None
         }
     }
 
     #[rustfmt::skip]
     pub fn set_commit(self: &mut Self, entry: &RepoCommit) {
+        self.commit = Some(entry.clone());
+
         self.list_view = ListView::new();
 
         self.list_view.insert_colorful_string(format!("Repo:       {}", entry.repo.rel_path), *RED);
@@ -38,6 +42,10 @@ impl DiffView {
             Self::trim_newline(&mut combined);
             self.list_view.insert_colorful_string(combined, Self::style_of(*sigil));
         }
+    }
+
+    pub fn commit(self: &Self) -> &Option<RepoCommit> {
+        &self.commit
     }
 
     fn trim_newline(s: &mut String) {

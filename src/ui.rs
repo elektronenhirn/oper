@@ -10,6 +10,7 @@ use cursive::views::{Canvas, LayerPosition, LinearLayout};
 use cursive::Cursive;
 use cursive::XY;
 use std::default::Default;
+use std::process::{Command, Stdio};
 
 fn build_status_bar(commits: usize, repos: usize, size: XY<usize>) -> impl cursive::view::View {
     Canvas::new((commits, repos, size))
@@ -102,6 +103,23 @@ pub fn show(model: MultiRepoHistory) {
     siv.add_global_callback('j', |s| {
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
         diff_view.on_event(Event::Key(Key::Down));
+    });
+    siv.add_global_callback('i', |s| {
+        let diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
+        if let Some(commit) = &diff_view.commit() {
+            let result = Command::new("gitk")
+                .current_dir(&commit.repo.abs_path)
+                .arg(format!("--select-commit={}", commit.commit_id))
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn();
+
+            if let Some(error) = &result.err() {
+                let mut main_view: ViewRef<MainView> = s.find_id("mainView").unwrap();
+                main_view.show_error("Failed to open gitk", error);
+            }
+        }
     });
 
     if let Some(commit) = first_commit {

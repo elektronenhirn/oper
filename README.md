@@ -34,4 +34,5 @@ cargo install oper
 - Define the number of days to include in the history with the _--days_ cli switch
 - Filter commits by using the _--author_ or _--message_ cli switches
 - Scroll in the diff view with _j_ (down) or _k_ (up)
+- Press _i_ to inspect a change in _gitk_ (you need to install gitk seperatly)
 - Quit oper by pressing _q_

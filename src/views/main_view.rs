@@ -120,6 +120,10 @@ impl MainView {
             entry.repo.rel_path
         ));
     }
+
+    pub fn show_error(self: &mut Self, context: &str, error: &std::io::Error) {
+        (*self.commit_bar_model).replace(format!("{}: {}", context, error));
+    }
 }
 
 impl ViewWrapper for MainView {

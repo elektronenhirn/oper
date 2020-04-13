@@ -3,17 +3,18 @@ use crate::styles::{BLUE, GREEN, LIGHT_BLUE, MAGENTA, RED, WHITE, YELLOW};
 use crate::views::ListView;
 use cursive::theme::ColorStyle;
 use cursive::view::ViewWrapper;
+use std::process::Command;
 
 pub struct DiffView {
     list_view: ListView,
-    commit: Option<RepoCommit>
+    commit: Option<RepoCommit>,
 }
 
 impl DiffView {
     pub fn empty() -> Self {
         DiffView {
             list_view: ListView::new(),
-            commit: None
+            commit: None,
         }
     }
 
@@ -22,50 +23,54 @@ impl DiffView {
         self.commit = Some(entry.clone());
 
         self.list_view = ListView::new();
-
         self.list_view.insert_colorful_string(format!("Repo:       {}", entry.repo.rel_path), *RED);
-        self.list_view.insert_colorful_string(format!("Id:         {}", entry.commit_id), *BLUE);
-        self.list_view.insert_colorful_string(format!("Author:     {}", entry.author), *LIGHT_BLUE);
-        self.list_view.insert_colorful_string(format!("Commit:     {}", entry.committer), *GREEN);
-        self.list_view.insert_colorful_string(format!("CommitDate: {}\n", entry.time_as_str()), *BLUE);
-        self.list_view.insert_colorful_string(entry.message.clone(), *WHITE);
-        self.list_view.insert_string("---".to_string());
 
-        let diff = entry.diff();
+        let output = Command::new("git")
+                     .current_dir(&entry.repo.abs_path)
+                     .arg("--no-pager")
+                     .arg("show")
+                     .arg("--patch-with-stat")
+                     .arg("--encoding=UTF-8")
+                     .arg("--pretty=fuller")
+                     .arg("--root")
+                     .arg("--patch-with-stat")
+                     .arg("--no-color")
+                     .arg(format!("{}", entry.commit_id))
+                     .output()
+                     .expect("Failed to execute git-show command. git not installed?");
 
-        for (sigil, line) in &diff {
-            let mut combined = match sigil {
-                ' ' | '+' | '-' => sigil.to_string() + line,
-                'F' => "\n".to_string() + line,
-                _ => line.to_string(),
-            };
-            Self::trim_newline(&mut combined);
-            self.list_view.insert_colorful_string(combined, Self::style_of(*sigil));
+        for line in String::from_utf8_lossy(&output.stdout).lines() {
+            self.list_view.insert_colorful_string(line.to_string(), Self::color_of(line));
         }
+    }
+
+    fn color_of(line: &str) -> ColorStyle {
+        let color_coding = [
+            ("commit ", *BLUE),
+            ("Author: ", *LIGHT_BLUE),
+            ("AuthorDate: ", *YELLOW),
+            ("Commit: ", *MAGENTA),
+            ("CommitDate: ", *YELLOW),
+            ("---", *YELLOW),
+            ("+++", *YELLOW),
+            ("new ", *YELLOW),
+            ("rename", *YELLOW),
+            ("diff", *YELLOW),
+            ("@", *MAGENTA),
+            ("+", *GREEN),
+            ("-", *RED),
+        ];
+
+        for cc in &color_coding {
+            if line.starts_with(cc.0) {
+                return cc.1;
+            }
+        }
+        return *WHITE;
     }
 
     pub fn commit(self: &Self) -> &Option<RepoCommit> {
         &self.commit
-    }
-
-    fn trim_newline(s: &mut String) {
-        if s.ends_with('\n') {
-            s.pop();
-            if s.ends_with('\r') {
-                s.pop();
-            }
-        }
-    }
-
-    fn style_of(sigil: char) -> ColorStyle {
-        match sigil {
-            ' ' => *BLUE,
-            '+' => *GREEN,
-            '-' => *RED,
-            'F' => *YELLOW,
-            'H' => *MAGENTA,
-            _ => *BLUE,
-        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::utils::{as_datetime, as_datetime_utc};
 use chrono::{Datelike, Duration, Timelike};
 use console::style;
-use git2::{Commit, Diff, DiffFormat, Oid, Repository, Time};
+use git2::{Commit, Oid, Repository, Time};
 use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::fmt;
@@ -76,7 +76,6 @@ impl MultiRepoHistory {
                 revwalk.simplify_first_parent();
                 revwalk.set_sorting(git2::Sort::TIME);
 
-
                 let mut commits = Vec::new();
                 for commit_id in revwalk {
                     let commit = commit_id
@@ -104,10 +103,7 @@ impl MultiRepoHistory {
             .collect();
 
         commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
-        Ok(MultiRepoHistory {
-            repos,
-            commits,
-        })
+        Ok(MultiRepoHistory { repos, commits })
     }
 }
 
@@ -186,38 +182,6 @@ impl RepoCommit {
             offset.num_hours(),
             offset.num_minutes() - offset.num_hours() * 60
         )
-    }
-
-    pub fn diff(&self) -> Vec<(char, String)> {
-        let git_repo = Repository::open(&self.repo.abs_path).expect("Failed to open git repo");
-        let commit = git_repo
-            .find_commit(self.commit_id)
-            .expect("Failed to find commit");
-        let a = if commit.parents().len() == 1 {
-            let parent = commit.parent(0).expect("Failed to find parent");
-            Some(parent.tree().expect(""))
-        } else {
-            None
-        };
-        let b = commit.tree().expect("Failed to open commit");
-        git_repo.diff_tree_to_tree(a.as_ref(), Some(&b), None)
-            .map(Self::diff_to_vec)
-            .unwrap_or_default()
-    }
-
-    fn diff_to_vec(diff: Diff<'_>) -> Vec<(char, String)> {
-        let mut lines = Vec::new();
-        diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
-            lines.push((
-                line.origin(),
-                std::str::from_utf8(line.content())
-                    .unwrap_or("<no utf8>")
-                    .to_string(),
-            ));
-            true
-        })
-        .unwrap();
-        lines
     }
 }
 

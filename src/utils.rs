@@ -36,7 +36,7 @@ pub fn find_repo_base_folder() -> Result<PathBuf, io::Error> {
     for parent in cwd.ancestors() {
         for entry in fs::read_dir(&parent)? {
             let entry = entry?;
-            if entry.file_name() == ".repo" {
+            if entry.path().is_dir() && entry.file_name() == ".repo" {
                 return Ok(parent.to_path_buf());
             }
         }

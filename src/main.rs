@@ -68,6 +68,12 @@ fn main() -> Result<(), String> {
                 .default_value(original_cwd.to_str().unwrap())
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("manifest")
+                .short("x")
+                .long("manifest")
+                .help("include changes to the manifest repository")
+        )
         .get_matches();
 
     let days = value_t!(matches.value_of("days"), u32).unwrap_or_else(|e| e.exit());
@@ -78,10 +84,15 @@ fn main() -> Result<(), String> {
     );
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    do_main(&classifier, cwd).or_else(|e| Err(e.description().into()))
+    do_main(&classifier, cwd, matches.is_present("manifest"))
+        .or_else(|e| Err(e.description().into()))
 }
 
-fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> {
+fn do_main(
+    classifier: &model::Classifier,
+    cwd: &Path,
+    include_manifest: bool,
+) -> Result<(), io::Error> {
     env::set_current_dir(cwd)?;
     rayon::ThreadPoolBuilder::new()
         .num_threads(std::cmp::min(num_cpus::get(), MAX_NUMBER_OF_THREADS))
@@ -89,7 +100,7 @@ fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> 
         .unwrap();
 
     let project_file = File::open(find_project_file()?)?;
-    let repos = repos_from(&project_file)?;
+    let repos = repos_from(&project_file, include_manifest)?;
 
     let history = MultiRepoHistory::from(repos, &classifier)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
@@ -99,14 +110,21 @@ fn do_main(classifier: &model::Classifier, cwd: &Path) -> Result<(), io::Error> 
     Ok(())
 }
 
-fn repos_from(project_file: &std::fs::File) -> Result<Vec<Arc<Repo>>, io::Error> {
+fn repos_from(
+    project_file: &std::fs::File,
+    include_manifest: bool,
+) -> Result<Vec<Arc<Repo>>, io::Error> {
     let mut repos = Vec::new();
 
     let base_folder = find_repo_base_folder()?;
     for project in BufReader::new(project_file).lines() {
         let rel_path = project.expect("project.list read error");
-        let abs_path = base_folder.join(&rel_path);
-        repos.push(Arc::new(Repo::from(abs_path, rel_path)));
+        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
+    }
+
+    if include_manifest {
+        let rel_path = String::from(".repo/manifests");
+        repos.push(Arc::new(Repo::from(base_folder.join(&rel_path), rel_path)));
     }
 
     Ok(repos)

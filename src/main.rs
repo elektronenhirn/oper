@@ -29,7 +29,7 @@ const MAX_NUMBER_OF_THREADS: usize = 18; //tests on a 36 core INTEL Xeon showed 
 fn main() -> Result<(), String> {
     let original_cwd = env::current_dir().expect("cwd not found");
     let matches = App::new("oper")
-        .version("0.1.0")
+        .version(crate_version!())
         .author("Florian Bramer <elektronenhirn@gmail.com>")
         .about("git-repo history tool")
         .arg(

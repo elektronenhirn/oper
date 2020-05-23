@@ -1,5 +1,7 @@
+use crate::config::Config;
 use crate::cursive::traits::View;
 use crate::model::{MultiRepoHistory, RepoCommit};
+use crate::utils::execute_on_commit;
 use crate::views::{DiffView, MainView, SeperatorView};
 use cursive::event::{Event, Key};
 use cursive::theme::{BaseColor, Color, ColorStyle};
@@ -10,7 +12,6 @@ use cursive::views::{Canvas, LayerPosition, LinearLayout};
 use cursive::Cursive;
 use cursive::XY;
 use std::default::Default;
-use std::process::{Command, Stdio};
 
 fn build_status_bar(commits: usize, repos: usize, size: XY<usize>) -> impl cursive::view::View {
     Canvas::new((commits, repos, size))
@@ -42,7 +43,7 @@ fn update(siv: &mut Cursive, index: usize, commits: usize, entry: &RepoCommit) {
     main_view.update_commit_bar(index, commits, &entry);
 }
 
-pub fn show(model: MultiRepoHistory) {
+pub fn show(model: MultiRepoHistory, config: &Config) {
     let commits = model.commits.len();
     let repos = model.repos.len();
     let first_commit = if commits > 0 {
@@ -90,40 +91,53 @@ pub fn show(model: MultiRepoHistory) {
     };
 
     siv.add_layer(layout);
-    siv.add_global_callback('q', |s| {
+
+    register_custom_commands(config, &mut siv);
+
+    register_builtin_command('q', &mut siv, |s| {
         s.pop_layer();
         if s.screen().get(LayerPosition::FromBack(0)).is_none() {
             s.quit();
         }
     });
-    siv.add_global_callback('k', |s| {
+    register_builtin_command('k', &mut siv, |s| {
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
         diff_view.on_event(Event::Key(Key::Up));
     });
-    siv.add_global_callback('j', |s| {
+    register_builtin_command('j', &mut siv, |s| {
         let mut diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
         diff_view.on_event(Event::Key(Key::Down));
-    });
-    siv.add_global_callback('i', |s| {
-        let diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
-        if let Some(commit) = &diff_view.commit() {
-            let result = Command::new("gitk")
-                .current_dir(&commit.repo.abs_path)
-                .arg(format!("--select-commit={}", commit.commit_id))
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn();
-
-            if let Some(error) = &result.err() {
-                let mut main_view: ViewRef<MainView> = s.find_id("mainView").unwrap();
-                main_view.show_error("Failed to open gitk", error);
-            }
-        }
     });
 
     if let Some(commit) = first_commit {
         update(&mut siv, 0, commits, &commit)
     }
     siv.run();
+}
+
+fn register_builtin_command<F>(ch: char, siv: &mut Cursive, cb: F)
+where
+    F: FnMut(&mut Cursive) + 'static,
+{
+    siv.clear_global_callbacks(ch); //to avoid that custom commands are taking over one of our builtin shortcuts
+    siv.add_global_callback(ch, cb);
+}
+
+fn register_custom_commands(config: &Config, siv: &mut Cursive) {
+    for cmd in &config.custom_command {
+        let executable = cmd.executable.clone();
+        let args = cmd.args.clone();
+
+        siv.add_global_callback(cmd.key, move |s| {
+            let diff_view: ViewRef<DiffView> = s.find_id("diffView").unwrap();
+            if let Some(commit) = &diff_view.commit() {
+                let result =
+                    execute_on_commit(&executable, args.as_ref().unwrap_or(&String::new()), commit);
+                if let Some(error) = &result.err() {
+                    let mut main_view: ViewRef<MainView> = s.find_id("mainView").unwrap();
+                    main_view.show_error("Failed to open gitk", error);
+                }
+            }
+        });
+    }
 }

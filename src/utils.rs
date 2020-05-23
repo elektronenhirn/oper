@@ -1,9 +1,11 @@
+use crate::model::RepoCommit;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use git2::Time;
 use std::env;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
 /// returns a path pointing to he project.list file in
 /// the .repo folder, or an io::Error in case the file
@@ -59,4 +61,24 @@ pub fn as_datetime(git_time: &Time) -> DateTime<FixedOffset> {
 /// timezone
 pub fn as_datetime_utc(git_time: &Time) -> DateTime<Utc> {
     as_datetime(git_time).with_timezone(&Utc)
+}
+
+/// executes an external executable with given arguments;
+/// if the pattern "{}" is found in the args parameter, it
+/// is replaced with the ID of the given commit
+pub fn execute_on_commit(
+    exec: &str,
+    args: &str,
+    commit: &RepoCommit,
+) -> Result<std::process::Child, std::io::Error> {
+    let commit_id = format!("{}", commit.commit_id);
+    let args_with_commit = args.replace("{}", &commit_id);
+
+    Command::new(exec)
+        .current_dir(&commit.repo.abs_path)
+        .args(args_with_commit.split(' '))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
 }

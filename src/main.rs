@@ -1,3 +1,4 @@
+extern crate app_dirs;
 #[macro_use]
 extern crate clap;
 extern crate cursive;
@@ -5,7 +6,10 @@ extern crate indicatif;
 extern crate num_cpus;
 #[macro_use]
 extern crate lazy_static;
+extern crate serde;
+extern crate toml;
 
+mod config;
 mod model;
 mod styles;
 mod ui;
@@ -93,6 +97,8 @@ fn do_main(
     cwd: &Path,
     include_manifest: bool,
 ) -> Result<(), io::Error> {
+    let config = config::read();
+
     env::set_current_dir(cwd)?;
     rayon::ThreadPoolBuilder::new()
         .num_threads(std::cmp::min(num_cpus::get(), MAX_NUMBER_OF_THREADS))
@@ -105,7 +111,7 @@ fn do_main(
     let history = MultiRepoHistory::from(repos, &classifier)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
 
-    ui::show(history);
+    ui::show(history, &config);
 
     Ok(())
 }

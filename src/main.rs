@@ -18,9 +18,7 @@ mod views;
 
 use clap::{App, Arg};
 use model::{MultiRepoHistory, Repo};
-use std::convert::Into;
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -89,7 +87,7 @@ fn main() -> Result<(), String> {
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
     do_main(&classifier, cwd, matches.is_present("manifest"))
-        .or_else(|e| Err(e.description().into()))
+        .or_else(|e| Err(e.to_string()))
 }
 
 fn do_main(
@@ -109,7 +107,7 @@ fn do_main(
     let repos = repos_from(&project_file, include_manifest)?;
 
     let history = MultiRepoHistory::from(repos, &classifier)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.description()))?;
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
     ui::show(history, &config);
 

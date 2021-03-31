@@ -15,6 +15,7 @@ mod styles;
 mod ui;
 mod utils;
 mod views;
+mod report;
 
 use clap::{App, Arg};
 use model::{MultiRepoHistory, Repo};
@@ -25,6 +26,7 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 use utils::{find_project_file, find_repo_base_folder};
+use anyhow::Result;
 
 const MAX_NUMBER_OF_THREADS: usize = 18; //tests on a 36 core INTEL Xeon showed that parsing becomes slower again if more than 18 threads are used
 
@@ -76,6 +78,13 @@ fn main() -> Result<(), String> {
                 .long("manifest")
                 .help("include changes to the manifest repository")
         )
+        .arg(
+            Arg::with_name("report")
+            .long("report")
+            .value_name("file")
+            .help("writes a report to a file given by <path> - supported formats: .csv, .ods, .xlsx")
+            .takes_value(true)
+        )
         .get_matches();
 
     let days = value_t!(matches.value_of("days"), u32).unwrap_or_else(|e| e.exit());
@@ -86,7 +95,7 @@ fn main() -> Result<(), String> {
     );
     let cwd = Path::new(matches.value_of("cwd").unwrap());
 
-    do_main(&classifier, cwd, matches.is_present("manifest"))
+    do_main(&classifier, cwd, matches.is_present("manifest"), matches.value_of("report"))
         .or_else(|e| Err(e.to_string()))
 }
 
@@ -94,7 +103,8 @@ fn do_main(
     classifier: &model::Classifier,
     cwd: &Path,
     include_manifest: bool,
-) -> Result<(), io::Error> {
+    report_file_path: Option<&str>
+) -> Result<()> {
     let config = config::read();
 
     env::set_current_dir(cwd)?;
@@ -109,7 +119,14 @@ fn do_main(
     let history = MultiRepoHistory::from(repos, &classifier)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
-    ui::show(history, &config);
+    //TUI or report?
+    match report_file_path {
+        None => ui::show(history, &config),
+        Some(file) => {
+            println!("Skipping UI - generating report...");
+            report::generate(&history, file)?
+        }
+    }
 
     Ok(())
 }

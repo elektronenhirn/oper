@@ -11,14 +11,15 @@ extern crate toml;
 
 mod config;
 mod model;
+mod report;
 mod styles;
 mod ui;
 mod utils;
 mod views;
-mod report;
 
+use anyhow::Result;
 use clap::{App, Arg};
-use model::{MultiRepoHistory, Repo};
+use model::{MultiRepoHistory, Repo, RevWalkStrategy};
 use std::env;
 use std::fs::File;
 use std::io;
@@ -26,7 +27,6 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 use utils::{find_project_file, find_repo_base_folder};
-use anyhow::Result;
 
 const MAX_NUMBER_OF_THREADS: usize = 18; //tests on a 36 core INTEL Xeon showed that parsing becomes slower again if more than 18 threads are used
 
@@ -64,6 +64,15 @@ fn main() -> Result<(), String> {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("revwalk-strategy")
+                .short("r")
+                .long("revwalk")
+                .value_name("strategy")
+                .help("traverse the 1st parent only ('first' = fast) or all parents ('all' = slow)")
+                .default_value("first")
+                .takes_value(true),
+        )
+        .arg(
             Arg::with_name("cwd")
                 .short("C")
                 .long("cwd")
@@ -94,16 +103,28 @@ fn main() -> Result<(), String> {
         matches.value_of("message"),
     );
     let cwd = Path::new(matches.value_of("cwd").unwrap());
+    let revwalk_strategy = match matches.value_of("revwalk-strategy") {
+        Some("first") => Ok(RevWalkStrategy::FirstParent),
+        Some("all") => Ok(RevWalkStrategy::AllParents),
+        _ => Err(format!("Unknown revwalk strategy given")),
+    }?;
 
-    do_main(&classifier, cwd, matches.is_present("manifest"), matches.value_of("report"))
-        .or_else(|e| Err(e.to_string()))
+    do_main(
+        &classifier,
+        &revwalk_strategy,
+        cwd,
+        matches.is_present("manifest"),
+        matches.value_of("report"),
+    )
+    .or_else(|e| Err(e.to_string()))
 }
 
 fn do_main(
     classifier: &model::Classifier,
+    revwalk_strategy: &RevWalkStrategy,
     cwd: &Path,
     include_manifest: bool,
-    report_file_path: Option<&str>
+    report_file_path: Option<&str>,
 ) -> Result<()> {
     let config = config::read();
 
@@ -116,7 +137,7 @@ fn do_main(
     let project_file = File::open(find_project_file()?)?;
     let repos = repos_from(&project_file, include_manifest)?;
 
-    let history = MultiRepoHistory::from(repos, &classifier)
+    let history = MultiRepoHistory::from(repos, &classifier, revwalk_strategy)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
 
     //TUI or report?

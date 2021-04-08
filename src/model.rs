@@ -19,6 +19,7 @@ impl MultiRepoHistory {
     pub fn from(
         repos: Vec<Arc<Repo>>,
         classifier: &Classifier,
+        rewalk_strategy: &RevWalkStrategy,
     ) -> Result<MultiRepoHistory, git2::Error> {
         let progress = MultiProgress::new();
         let progress_bars = (0..rayon::current_num_threads())
@@ -73,7 +74,9 @@ impl MultiRepoHistory {
                     .push_head()
                     .map_err(|e| progress_error("Failed query history", &e))
                     .ok()?;
-                revwalk.simplify_first_parent().ok()?;
+                if rewalk_strategy == &RevWalkStrategy::FirstParent {
+                    revwalk.simplify_first_parent().ok()?;
+                }
                 revwalk.set_sorting(git2::Sort::TIME).ok()?;
 
                 let mut commits = Vec::new();
@@ -233,4 +236,10 @@ impl Classifier {
 
         (include, abort)
     }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum RevWalkStrategy {
+    FirstParent,
+    AllParents,
 }

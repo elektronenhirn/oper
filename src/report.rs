@@ -8,10 +8,6 @@ use spsheet::xlsx;
 use spsheet::{Book, Cell, Sheet};
 
 pub fn generate(model: &MultiRepoHistory, output_file_path: &str) -> Result<()> {
-    if model.commits.is_empty() {
-        return Err(anyhow!("No (unfiltered) repos left to write report about"));
-    }
-
     let path = Path::new(output_file_path);
     let extension = path.extension().and_then(|s| s.to_str());
     if extension.is_none() {

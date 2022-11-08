@@ -32,7 +32,7 @@ use cursive::direction::Direction;
 use cursive::event::{Callback, Event, EventResult, Key};
 use cursive::theme;
 use cursive::vec::Vec2;
-use cursive::view::{ScrollBase, View};
+use cursive::view::{ScrollBase, CannotFocus, View};
 use cursive::With;
 use cursive::{Cursive, Printer};
 
@@ -734,8 +734,8 @@ impl<T: TableViewItem<H> + 'static, H: Eq + Hash + Copy + Clone + 'static> View
         self.last_size = size;
     }
 
-    fn take_focus(&mut self, _: Direction) -> bool {
-        self.enabled
+    fn take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
+        self.enabled.then(EventResult::consumed).ok_or(CannotFocus)
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {

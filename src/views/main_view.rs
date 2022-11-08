@@ -54,7 +54,7 @@ impl MainView {
 
         MainView {
             layout: LinearLayout::vertical()
-                .child(table.with_id("table").full_screen())
+                .child(table.with_name("table").full_screen())
                 .child(commit_bar),
             commit_bar_model,
         }
@@ -65,10 +65,10 @@ impl MainView {
         F: Fn(&mut Cursive, usize, usize, &RepoCommit) + 'static,
     {
         let mut table: ViewRef<TableView<RepoCommit, Column>> =
-            self.layout.find_id("table").unwrap();
+            self.layout.find_name("table").unwrap();
         table.set_on_select(move |siv: &mut Cursive, row: usize, index: usize| {
             let entry = siv
-                .call_on_id("table", move |table: &mut TableView<RepoCommit, Column>| {
+                .call_on_name("table", move |table: &mut TableView<RepoCommit, Column>| {
                     table.borrow_item(index).unwrap().clone()
                 })
                 .unwrap();

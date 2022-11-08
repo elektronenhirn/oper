@@ -32,7 +32,7 @@ use cursive::theme;
 use cursive::theme::{ColorStyle, Style};
 use cursive::utils::span::{SpannedStr, SpannedString};
 use cursive::vec::Vec2;
-use cursive::view::{ScrollBase, View};
+use cursive::view::{ScrollBase, CannotFocus, View};
 use cursive::With;
 use cursive::{Cursive, Printer};
 
@@ -395,8 +395,8 @@ impl View for ListView {
         self.last_size = size;
     }
 
-    fn take_focus(&mut self, _: Direction) -> bool {
-        self.enabled
+    fn take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
+        self.enabled.then(EventResult::consumed).ok_or(CannotFocus)
     }
 
     fn on_event(&mut self, event: Event) -> EventResult {

@@ -142,7 +142,7 @@ fn do_main(
 
     //TUI or report?
     match report_file_path {
-        None => ui::show(history, &config),
+        None => ui::show(history, config),
         Some(file) => {
             println!("Skipping UI - generating report...");
             report::generate(&history, file)?

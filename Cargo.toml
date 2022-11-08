@@ -15,7 +15,7 @@ app_dirs = "1.2.1"
 chrono = "0.4.10"
 clap = "2.33.0"
 console = "0.14.0"
-cursive = "0.12"
+cursive = { version = "0.20", features = ["toml"] }
 csv = "1.1.4"
 git2 = "0.13.17"
 indicatif = { version = "0.15.0", features = ["with_rayon"] }

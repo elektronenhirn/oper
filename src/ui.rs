@@ -5,13 +5,13 @@ use crate::utils::execute_on_commit;
 use crate::views::{DiffView, MainView, SeperatorView};
 use cursive::event::{Event, Key};
 use cursive::theme::{BaseColor, Color, ColorStyle};
-use cursive::traits::Resizable;
 use cursive::traits::Nameable;
-use cursive::views::{ResizedView, ViewRef};
+use cursive::traits::Resizable;
 use cursive::views::{Canvas, LayerPosition, LinearLayout};
+use cursive::views::{ResizedView, ViewRef};
 use cursive::Cursive;
-use cursive::XY;
 use cursive::CursiveExt;
+use cursive::XY;
 use std::default::Default;
 
 fn build_status_bar(commits: usize, repos: usize, size: XY<usize>) -> impl cursive::view::View {
@@ -45,85 +45,82 @@ fn update(siv: &mut Cursive, index: usize, commits: usize, entry: &RepoCommit) {
 }
 
 pub fn show(model: MultiRepoHistory, config: Config) {
-
     let mut siv = Cursive::default();
     siv.load_toml(include_str!("../assets/style.toml")).unwrap();
 
     //Postpone the initialization of the UI until cursive is running so we can
     // query the terminal dimensions with screen_size()
-    siv.cb_sink().send(Box::new(move |siv| {
+    siv.cb_sink()
+        .send(Box::new(move |siv| {
+            let commits = model.commits.len();
+            let repos = model.repos.len();
+            let first_commit = if commits > 0 {
+                Some(model.commits.get(0).unwrap().clone())
+            } else {
+                None
+            };
 
-        let commits = model.commits.len();
-        let repos = model.repos.len();
-        let first_commit = if commits > 0 {
-            Some(model.commits.get(0).unwrap().clone())
-        } else {
-            None
-        };
+            let screen_size = siv.screen_size();
 
-        let screen_size = siv.screen_size();
+            let mut main_view = MainView::from(model);
 
-        let mut main_view = MainView::from(model);
+            main_view.set_on_select(
+                move |siv: &mut Cursive, _row: usize, index: usize, entry: &RepoCommit| {
+                    let mut diff_view: ViewRef<DiffView> = siv.find_name("diffView").unwrap();
+                    diff_view.set_commit(&entry);
+                    let mut main_view: ViewRef<MainView> = siv.find_name("mainView").unwrap();
+                    main_view.update_commit_bar(index, commits, &entry);
+                },
+            );
+            let landscape_format = screen_size.x / (screen_size.y * 3) >= 1;
+            let layout = if landscape_format {
+                LinearLayout::vertical()
+                    .child(
+                        LinearLayout::horizontal()
+                            .child(main_view.with_name("mainView").full_screen())
+                            .child(SeperatorView::vertical())
+                            .child(ResizedView::with_fixed_width(
+                                screen_size.x / 2 - 1,
+                                DiffView::empty().with_name("diffView"),
+                            )),
+                    )
+                    .child(build_status_bar(commits, repos, screen_size))
+            } else {
+                LinearLayout::vertical()
+                    .child(main_view.with_name("mainView").full_screen())
+                    .child(ResizedView::with_fixed_height(
+                        screen_size.y / 2 - 1,
+                        DiffView::empty().with_name("diffView"),
+                    ))
+                    .child(build_status_bar(commits, repos, screen_size))
+            };
 
-        main_view.set_on_select(
-            move |siv: &mut Cursive, _row: usize, index: usize, entry: &RepoCommit| {
-                let mut diff_view: ViewRef<DiffView> = siv.find_name("diffView").unwrap();
-                diff_view.set_commit(&entry);
-                let mut main_view: ViewRef<MainView> = siv.find_name("mainView").unwrap();
-                main_view.update_commit_bar(index, commits, &entry);
-            },
-        );
-        let landscape_format = screen_size.x / (screen_size.y * 3) >= 1;
-        let layout = if landscape_format {
-            LinearLayout::vertical()
-                .child(
-                    LinearLayout::horizontal()
-                        .child(main_view.with_name("mainView").full_screen())
-                        .child(SeperatorView::vertical())
-                        .child(ResizedView::with_fixed_width(
-                            screen_size.x / 2 - 1,
-                            DiffView::empty().with_name("diffView"),
-                        )),
-                )
-                .child(build_status_bar(commits, repos, screen_size))
-        } else {
-            LinearLayout::vertical()
-                .child(main_view.with_name("mainView").full_screen())
-                .child(ResizedView::with_fixed_height(
-                    screen_size.y / 2 - 1,
-                    DiffView::empty().with_name("diffView"),
-                ))
-                .child(build_status_bar(commits, repos, screen_size))
-        };
+            siv.add_layer(layout);
 
-        siv.add_layer(layout);
+            register_custom_commands(&config, siv);
 
-        register_custom_commands(&config, siv);
+            register_builtin_command('q', siv, |s| {
+                s.pop_layer();
+                if s.screen().get(LayerPosition::FromBack(0)).is_none() {
+                    s.quit();
+                }
+            });
+            register_builtin_command('k', siv, |s| {
+                let mut diff_view: ViewRef<DiffView> = s.find_name("diffView").unwrap();
+                diff_view.on_event(Event::Key(Key::Up));
+            });
+            register_builtin_command('j', siv, |s| {
+                let mut diff_view: ViewRef<DiffView> = s.find_name("diffView").unwrap();
+                diff_view.on_event(Event::Key(Key::Down));
+            });
 
-        register_builtin_command('q', siv, |s| {
-            s.pop_layer();
-            if s.screen().get(LayerPosition::FromBack(0)).is_none() {
-                s.quit();
+            if let Some(commit) = first_commit {
+                update(siv, 0, commits, &commit)
             }
-        });
-        register_builtin_command('k', siv, |s| {
-            let mut diff_view: ViewRef<DiffView> = s.find_name("diffView").unwrap();
-            diff_view.on_event(Event::Key(Key::Up));
-        });
-        register_builtin_command('j', siv, |s| {
-            let mut diff_view: ViewRef<DiffView> = s.find_name("diffView").unwrap();
-            diff_view.on_event(Event::Key(Key::Down));
-        });
-
-        if let Some(commit) = first_commit {
-            update(siv, 0, commits, &commit)
-        }
-
-    })).unwrap();
-
+        }))
+        .unwrap();
 
     siv.run(); //this call blocks until UI gets terminated
-
 }
 
 fn register_builtin_command<F>(ch: char, siv: &mut Cursive, cb: F)

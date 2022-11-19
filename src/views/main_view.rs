@@ -78,10 +78,10 @@ impl MainView {
 
     fn new_table(model: MultiRepoHistory) -> TableView<RepoCommit, Column> {
         let mut table = TableView::<RepoCommit, Column>::new()
-            .column(Column::CommitDateTime, "Commit", |c| {
+            .column(Column::CommitDateTime, "CommitDate", |c| {
                 c.width(COLUMN_WIDTH_COMMIT_DATE)
             })
-            .column(Column::Repo, "Repo", |c| {
+            .column(Column::Repo, "Git Repo", |c| {
                 c.width(COLUMN_WIDTH_REPO_NAME).color(*RED)
             })
             .column(Column::Comitter, "Committer", |c| {

@@ -9,13 +9,13 @@
 
 //! A basic list view implementation for [cursive](https://crates.io/crates/cursive).
 #![deny(
-  missing_docs,
-  missing_copy_implementations,
-  trivial_casts,
-  trivial_numeric_casts,
-  unsafe_code,
-  unused_import_braces,
-  unused_qualifications
+    missing_docs,
+    missing_copy_implementations,
+    trivial_casts,
+    trivial_numeric_casts,
+    unsafe_code,
+    unused_import_braces,
+    unused_qualifications
 )]
 
 // Crate Dependencies ---------------------------------------------------------
@@ -27,13 +27,13 @@ use std::rc::Rc;
 
 // External Dependencies ------------------------------------------------------
 use cursive::direction::Direction;
-use cursive::event::{Callback, Event, EventResult, Key};
-use cursive::theme;
+use cursive::event::{Callback, Event, EventResult, Key, MouseButton, MouseEvent};
 use cursive::theme::{ColorStyle, Style};
 use cursive::utils::span::{SpannedStr, SpannedString};
 use cursive::vec::Vec2;
-use cursive::view::{ScrollBase, CannotFocus, View};
+use cursive::view::{scroll, CannotFocus, View};
 use cursive::With;
+use cursive::{theme, Rect};
 use cursive::{Cursive, Printer};
 
 /// Callback taking as argument the row and the index of an element.
@@ -44,8 +44,8 @@ type IndexCallback = Rc<dyn Fn(&mut Cursive, usize, usize)>;
 /// View to select an SpnnedString among a list
 pub struct ListView {
     enabled: bool,
-    scrollbase: ScrollBase,
-    last_size: Vec2,
+    scroll_core: scroll::Core,
+    needs_relayout: bool,
 
     focus: usize,
     items: Vec<SpannedString<Style>>,
@@ -56,6 +56,8 @@ pub struct ListView {
     on_submit: Option<IndexCallback>,
     on_select: Option<IndexCallback>,
 }
+cursive::impl_scroller!(ListView::scroll_core);
+
 impl Default for ListView {
     /// Creates a new empty `ListView` without any columns.
     ///
@@ -74,8 +76,8 @@ impl ListView {
     pub fn new() -> Self {
         Self {
             enabled: true,
-            scrollbase: ScrollBase::new(),
-            last_size: Vec2::new(0, 0),
+            scroll_core: scroll::Core::new(),
+            needs_relayout: true,
 
             focus: 0,
             items: Vec::new(),
@@ -195,6 +197,7 @@ impl ListView {
         self.items.clear();
         self.rows_to_items.clear();
         self.focus = 0;
+        self.needs_relayout = true;
     }
 
     /// Returns the number of items in this table.
@@ -219,7 +222,7 @@ impl ListView {
     /// Selects the row at the specified index.
     pub fn set_selected_row(&mut self, row_index: usize) {
         self.focus = row_index;
-        self.scrollbase.scroll_to(row_index);
+        self.scroll_core.scroll_to_y(row_index);
     }
 
     /// Selects the row at the specified index.
@@ -271,7 +274,7 @@ impl ListView {
             for (row, item) in self.rows_to_items.iter().enumerate() {
                 if *item == item_index {
                     self.focus = row;
-                    self.scrollbase.scroll_to(row);
+                    self.scroll_core.scroll_to_y(row);
                     break;
                 }
             }
@@ -294,8 +297,7 @@ impl ListView {
         self.items.push(item);
         self.rows_to_items.push(self.items.len() - 1);
 
-        self.scrollbase
-            .set_heights(self.last_size.y.saturating_sub(2), self.rows_to_items.len());
+        self.needs_relayout = true;
     }
 
     pub fn insert_string(&mut self, s: String) {
@@ -331,9 +333,7 @@ impl ListView {
                 }
             }
 
-            // Update scroll height to prevent out of index drawing
-            self.scrollbase
-                .set_heights(self.last_size.y, self.rows_to_items.len());
+            self.needs_relayout = true;
 
             // Remove actual item from the underlying storage
             Some(self.items.remove(item_index))
@@ -344,10 +344,9 @@ impl ListView {
 
     /// Removes all items from the underlying storage and returns them.
     pub fn take_items(&mut self) -> Vec<SpannedString<Style>> {
-        self.scrollbase
-            .set_heights(self.last_size.y.saturating_sub(2), 0);
         self.set_selected_row(0);
         self.rows_to_items.clear();
+        self.needs_relayout = true;
         self.items.drain(0..).collect()
     }
 }
@@ -365,6 +364,16 @@ impl ListView {
         }
     }
 
+    fn on_focus_change(&self) -> EventResult {
+        let row = self.row().unwrap();
+        let index = self.item().unwrap();
+        EventResult::Consumed(
+            self.on_select
+                .clone()
+                .map(|cb| Callback::from_fn(move |s| cb(s, row, index))),
+        )
+    }
+
     fn focus_up(&mut self, n: usize) {
         self.focus -= cmp::min(self.focus, n);
     }
@@ -372,40 +381,35 @@ impl ListView {
     fn focus_down(&mut self, n: usize) {
         self.focus = cmp::min(self.focus + n, self.items.len() - 1);
     }
-}
 
-impl View for ListView {
-    fn draw(&self, printer: &Printer) {
-        let printer = &printer.focused(true);
-        self.scrollbase.draw(printer, |printer, i| {
-            if i < self.items.len() {
-                self.draw_item(self.focus == i, printer, i);
-            }
-        });
+    fn layout_content(&mut self, _size: Vec2) {
+        self.needs_relayout = false;
     }
 
-    fn layout(&mut self, size: Vec2) {
-        if size == self.last_size {
-            return;
+    fn content_required_size(&mut self, req: Vec2) -> Vec2 {
+        Vec2::new(req.x, self.rows_to_items.len())
+    }
+
+    fn inner_important_area(&self, size: Vec2) -> Rect {
+        Rect::from_size((0, self.focus), (size.x, 1))
+    }
+
+    fn draw_content(&self, printer: &Printer) {
+        for i in 0..self.rows_to_items.len() {
+            let printer = printer.offset((0, i));
+            self.draw_item(self.focus == i, &printer, i);
         }
-
-        let item_count = self.items.len();
-
-        self.scrollbase.set_heights(size.y, item_count);
-        self.last_size = size;
     }
 
-    fn take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
-        self.enabled.then(EventResult::consumed).ok_or(CannotFocus)
-    }
-
-    fn on_event(&mut self, event: Event) -> EventResult {
-        if !self.enabled {
-            return EventResult::Ignored;
-        }
-
+    fn on_inner_event(&mut self, event: Event) -> EventResult {
         let last_focus = self.focus;
         match event {
+            Event::Key(Key::Right) => {
+                return EventResult::Ignored;
+            }
+            Event::Key(Key::Left) => {
+                return EventResult::Ignored;
+            }
             Event::Key(Key::Up) if self.focus > 0 => {
                 self.focus_up(1);
             }
@@ -422,34 +426,90 @@ impl View for ListView {
                 self.focus = 0;
             }
             Event::Key(Key::End) => {
-                self.focus = self.items.len() - 1;
+                self.focus = self.items.len().saturating_sub(1);
             }
             Event::Key(Key::Enter) => {
                 if !self.is_empty() && self.on_submit.is_some() {
-                    let cb = self.on_submit.clone().unwrap();
-                    let row = self.row().unwrap();
-                    let index = self.item().unwrap();
-                    return EventResult::Consumed(Some(Callback::from_fn(move |s| {
-                        cb(s, row, index)
-                    })));
+                    return self.on_submit_event();
                 }
             }
+            Event::Mouse {
+                position,
+                offset,
+                event: MouseEvent::Press(MouseButton::Left),
+            } if !self.is_empty()
+                && position
+                    .checked_sub(offset)
+                    .map_or(false, |p| p.y == self.focus) =>
+            {
+                return self.on_submit_event();
+            }
+            Event::Mouse {
+                position,
+                offset,
+                event: MouseEvent::Press(_),
+            } if !self.is_empty() => match position.checked_sub(offset) {
+                Some(position) if position.y < self.rows_to_items.len() => {
+                    self.focus = position.y;
+                }
+                _ => return EventResult::Ignored,
+            },
             _ => return EventResult::Ignored,
         }
 
         let focus = self.focus;
-        self.scrollbase.scroll_to(focus);
 
         if !self.is_empty() && last_focus != focus {
-            let row = self.row().unwrap();
-            let index = self.item().unwrap();
-            EventResult::Consumed(
-                self.on_select
-                    .clone()
-                    .map(|cb| Callback::from_fn(move |s| cb(s, row, index))),
-            )
+            self.on_focus_change()
         } else {
             EventResult::Ignored
         }
+    }
+
+    fn on_submit_event(&mut self) -> EventResult {
+        if let Some(ref cb) = &self.on_submit {
+            let cb = Rc::clone(cb);
+            let row = self.row().unwrap();
+            let index = self.item().unwrap();
+            return EventResult::Consumed(Some(Callback::from_fn(move |s| cb(s, row, index))));
+        }
+        EventResult::Ignored
+    }
+}
+
+impl View for ListView {
+    fn draw(&self, printer: &Printer) {
+        scroll::draw(self, printer, Self::draw_content);
+    }
+
+    fn layout(&mut self, size: Vec2) {
+        scroll::layout(
+            self,
+            size.saturating_sub((0, 2)),
+            self.needs_relayout,
+            Self::layout_content,
+            Self::content_required_size,
+        );
+    }
+
+    fn take_focus(&mut self, _: Direction) -> Result<EventResult, CannotFocus> {
+        self.enabled.then(EventResult::consumed).ok_or(CannotFocus)
+    }
+
+    fn on_event(&mut self, event: Event) -> EventResult {
+        if !self.enabled {
+            return EventResult::Ignored;
+        }
+
+        scroll::on_event(
+            self,
+            event,
+            Self::on_inner_event,
+            Self::inner_important_area,
+        )
+    }
+
+    fn important_area(&self, size: Vec2) -> Rect {
+        self.inner_important_area(size.saturating_sub((0, 2))) + (0, 2)
     }
 }

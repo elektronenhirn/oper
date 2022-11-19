@@ -6,6 +6,7 @@ use indicatif::{MultiProgress, ParallelProgressIterator, ProgressBar, ProgressSt
 use rayon::prelude::*;
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 
@@ -13,6 +14,7 @@ use std::thread;
 pub struct MultiRepoHistory {
     pub repos: Vec<Arc<Repo>>,
     pub commits: Vec<RepoCommit>,
+    pub locally_missing_commits: usize,
 }
 
 impl MultiRepoHistory {
@@ -21,28 +23,14 @@ impl MultiRepoHistory {
         classifier: &Classifier,
         rewalk_strategy: &RevWalkStrategy,
     ) -> Result<MultiRepoHistory, git2::Error> {
-        let progress = MultiProgress::new();
-        let progress_bars = (0..rayon::current_num_threads())
-            .enumerate()
-            .map(|(n, _)| {
-                let pb = ProgressBar::hidden();
-                pb.set_prefix(&n.to_string());
-                pb.set_style(
-                    ProgressStyle::default_spinner().template("[{prefix}] {wide_msg:.bold.dim}"),
-                );
-                progress.add(pb)
-            })
-            .collect::<Vec<ProgressBar>>();
-        let overall_progress = ProgressBar::new(repos.len() as u64);
-        overall_progress.set_style(
-            ProgressStyle::default_bar()
-                .template(" {spinner:.bold.cyan}  Scanned {pos} of {len} repositories"),
-        );
-        let overall_progress = progress.add(overall_progress);
+        let (progress, progress_bars, overall_progress) = Self::create_progress_bars(&repos);
 
         thread::spawn(move || {
             progress.join_and_clear().unwrap();
         });
+
+        let missing_commits = Arc::new(AtomicUsize::new(0));
+        let missing_commits_result = missing_commits.clone();
 
         let mut commits: Vec<RepoCommit> = repos
             .par_iter()
@@ -83,7 +71,9 @@ impl MultiRepoHistory {
                 for commit_id in revwalk {
                     let commit = commit_id
                         .and_then(|commit_id| git_repo.find_commit(commit_id))
-                        .map_err(|e| progress_error("Failed to find commit", &e))
+                        .map_err(|_e| {
+                            missing_commits.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                        })
                         .ok()?;
                     let (include, abort) = classifier.classify(&commit);
                     if include {
@@ -105,8 +95,36 @@ impl MultiRepoHistory {
             .flatten()
             .collect();
 
-        commits.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp).reverse());
-        Ok(MultiRepoHistory { repos, commits })
+        commits.sort_unstable_by(|a, b| a.commit_time.cmp(&b.commit_time).reverse());
+        Ok(MultiRepoHistory {
+            repos,
+            commits,
+            locally_missing_commits: missing_commits_result.load(Ordering::Relaxed),
+        })
+    }
+
+    fn create_progress_bars(
+        repos: &Vec<Arc<Repo>>,
+    ) -> (MultiProgress, Vec<ProgressBar>, ProgressBar) {
+        let progress = MultiProgress::new();
+        let progress_bars = (0..rayon::current_num_threads())
+            .enumerate()
+            .map(|(n, _)| {
+                let pb = ProgressBar::hidden();
+                pb.set_prefix(&n.to_string());
+                pb.set_style(
+                    ProgressStyle::default_spinner().template("[{prefix}] {wide_msg:.bold.dim}"),
+                );
+                progress.add(pb)
+            })
+            .collect::<Vec<ProgressBar>>();
+        let overall_progress = ProgressBar::new(repos.len() as u64);
+        overall_progress.set_style(
+            ProgressStyle::default_bar()
+                .template(" {spinner:.bold.cyan}  Scanned {pos} of {len} repositories"),
+        );
+        let overall_progress = progress.add(overall_progress);
+        (progress, progress_bars, overall_progress)
     }
 }
 
@@ -143,7 +161,7 @@ impl Repo {
 #[derive(Clone)]
 pub struct RepoCommit {
     pub repo: Arc<Repo>,
-    pub timestamp: Time,
+    pub commit_time: Time,
     pub summary: String,
     pub author: String,
     pub committer: String,
@@ -153,26 +171,19 @@ pub struct RepoCommit {
 
 impl RepoCommit {
     pub fn from(repo: Arc<Repo>, commit: &Commit) -> RepoCommit {
-        let timestamp = commit.time();
-        let summary = commit.summary().unwrap_or("None");
-        let author = commit.author().name().unwrap_or("None").into();
-        let committer = commit.committer().name().unwrap_or("None").into();
-        let commit_id = commit.id();
-        let message = commit.message().unwrap_or("").to_string();
-
         RepoCommit {
             repo,
-            timestamp,
-            summary: summary.into(),
-            author,
-            committer,
-            commit_id,
-            message,
+            commit_time: commit.time(),
+            summary: commit.summary().unwrap_or("None").into(),
+            author: commit.author().name().unwrap_or("None").into(),
+            committer: commit.committer().name().unwrap_or("None").into(),
+            commit_id: commit.id(),
+            message: commit.message().unwrap_or("").to_string(),
         }
     }
 
     pub fn time_as_str(&self) -> String {
-        let date_time = as_datetime(&self.timestamp);
+        let date_time = as_datetime(&self.commit_time);
         let offset = Duration::seconds(i64::from(date_time.offset().local_minus_utc()));
 
         format!(

@@ -14,16 +14,24 @@ use cursive::CursiveExt;
 use cursive::XY;
 use std::default::Default;
 
-fn build_status_bar(commits: usize, repos: usize, size: XY<usize>) -> impl cursive::view::View {
-    Canvas::new((commits, repos, size))
-        .with_draw(|(commits, repos, size), printer| {
+fn build_status_bar(
+    commits: usize,
+    repos: usize,
+    missing_commits: usize,
+    size: XY<usize>,
+) -> impl cursive::view::View {
+    Canvas::new((commits, repos, missing_commits, size))
+        .with_draw(|(commits, repos, missing_commits, size), printer| {
             let style = ColorStyle::new(
                 Color::Dark(BaseColor::Black),
                 Color::Light(BaseColor::Black),
             );
 
             printer.with_style(style, |p| {
-                let text_left = format!("Found {} commits across {} repositories", commits, repos);
+                let text_left = match missing_commits {
+                    0 => format!("Found {} commits across {} repositories", commits, repos),
+                    _ => format!("Found {} commits across {} repositories - {} parent commits not found locally (shallow git clone?)", commits, repos, missing_commits)
+                };
                 let text_right = format!(" [{}x{}]", size.x, size.y);
                 p.print((0, 0), &text_left);
                 let gap: i32 = p.size.x as i32 - text_left.len() as i32 - text_right.len() as i32;
@@ -54,6 +62,8 @@ pub fn show(model: MultiRepoHistory, config: Config) {
         .send(Box::new(move |siv| {
             let commits = model.commits.len();
             let repos = model.repos.len();
+            let locally_missing_commits = model.locally_missing_commits;
+
             let first_commit = if commits > 0 {
                 Some(model.commits.get(0).unwrap().clone())
             } else {
@@ -84,7 +94,12 @@ pub fn show(model: MultiRepoHistory, config: Config) {
                                 DiffView::empty().with_name("diffView"),
                             )),
                     )
-                    .child(build_status_bar(commits, repos, screen_size))
+                    .child(build_status_bar(
+                        commits,
+                        repos,
+                        locally_missing_commits,
+                        screen_size,
+                    ))
             } else {
                 LinearLayout::vertical()
                     .child(main_view.with_name("mainView").full_screen())
@@ -92,7 +107,12 @@ pub fn show(model: MultiRepoHistory, config: Config) {
                         screen_size.y / 2 - 1,
                         DiffView::empty().with_name("diffView"),
                     ))
-                    .child(build_status_bar(commits, repos, screen_size))
+                    .child(build_status_bar(
+                        commits,
+                        repos,
+                        locally_missing_commits,
+                        screen_size,
+                    ))
             };
 
             siv.add_layer(layout);

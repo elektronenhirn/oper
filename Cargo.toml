@@ -14,10 +14,10 @@ anyhow = "1.0.34"
 app_dirs = "1.2.1"
 chrono = "0.4.10"
 clap = "2.33.0"
-console = "0.14.0"
+console = "0.15.2"
 cursive = { version = "0.20", features = ["toml"] }
 csv = "1.1.4"
-git2 = "0.13.17"
+git2 = "0.15.0"
 indicatif = { version = "0.15.0", features = ["with_rayon"] }
 lazy_static = "1.4.0"
 log = "0.4.8"
@@ -27,5 +27,5 @@ serde = { version = "1.0.106", features = ["derive"] }
 serde_any = { version = "0.5", default-features = false, features = ["toml"] }
 simple_logger = "1.5.0"
 spsheet = { version = "0.1.0", features = ["ods","xlsx"]}
-time = "0.2.6"
+time = "0.3.17"
 toml = "0.5.6"

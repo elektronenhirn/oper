@@ -53,7 +53,7 @@ pub fn find_repo_base_folder() -> Result<PathBuf, io::Error> {
 /// rust-idiomatic equivalent
 pub fn as_datetime(git_time: &Time) -> DateTime<FixedOffset> {
     let offset_in_secs = git_time.offset_minutes() * 60;
-    FixedOffset::east(offset_in_secs).timestamp(git_time.seconds(), 0)
+    FixedOffset::east_opt(offset_in_secs).unwrap().timestamp_opt(git_time.seconds(), 0).unwrap()
 }
 
 /// converts a git2 time datastructure into its

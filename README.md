@@ -1,9 +1,9 @@
-# Scope
+# What is oper?
 Oper is a basic history tool for git repositories managed by google's [git-repo tool](https://source.android.com/setup/develop/repo).
 
-It can show the history of the last _n_ days across all managed git repositories.
+It can show a linear history __across all__ managed git repositories.
 
-Oper is inspired by [tig](https://jonas.github.io/tig/), but is far for more basic. Don't expect any commands or additional views.
+Oper is inspired by [tig](https://jonas.github.io/tig/), but is far for more basic.
 
 ![Screenshot](./screenshot.png)
 
@@ -31,8 +31,15 @@ cargo install oper
 
 # Usage
 
+Simply execute `oper` in a folder which is managed by `git-repo`.
+
+For more advanced usage watch out for command line parameters:
+
 - Define the number of days to include in the history with the `--days` cli switch
 - Filter commits by using the `--author` or `--message` cli switches
+
+Keys in the UI:
+
 - Scroll in the diff view with `j` (down) or `k` (up)
 - Press `i` to inspect a change in _gitk_ (you need to install _gitk_ seperatly)
 - Quit oper by pressing `q`

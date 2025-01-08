@@ -356,7 +356,7 @@ impl ListView {
         let item = &self.items[i];
         if focused {
             let item_without_color = SpannedString::<Style>::plain(item.source());
-            printer.with_style(theme::ColorStyle::highlight(), |printer: &Printer| {
+            printer.with_style(ColorStyle::highlight(), |printer: &Printer| {
                 printer.print_styled((0, 0), SpannedStr::from(&item_without_color));
             });
         } else {

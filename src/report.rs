@@ -153,7 +153,7 @@ fn model_into_spreadsheet(
     for commit in &model.commits {
         builder.add_cell(commit.time_as_str())?;
         builder.add_cell(commit.repo.rel_path.clone())?;
-        builder.add_cell(commit.author.to_string())?;
+        builder.add_cell(commit.author_name.to_string())?;
         builder.add_cell(commit.summary.to_string())?;
         builder.add_cell(commit.message.to_string())?;
         builder.finish_row()?;

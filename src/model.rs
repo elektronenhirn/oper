@@ -163,7 +163,8 @@ pub struct RepoCommit {
     pub repo: Arc<Repo>,
     pub commit_time: Time,
     pub summary: String,
-    pub author: String,
+    pub author_name: String,
+    pub author_email: String,
     pub committer: String,
     pub commit_id: Oid,
     pub message: String,
@@ -175,7 +176,8 @@ impl RepoCommit {
             repo,
             commit_time: commit.time(),
             summary: commit.summary().unwrap_or("None").into(),
-            author: commit.author().name().unwrap_or("None").into(),
+            author_name: commit.author().name().unwrap_or("None").into(),
+            author_email: commit.author().email().unwrap_or("None").into(),
             committer: commit.committer().name().unwrap_or("None").into(),
             commit_id: commit.id(),
             message: commit.message().unwrap_or("").to_string(),
@@ -241,8 +243,10 @@ impl Classifier {
         }
 
         if let Some(ref author) = self.author {
-            let ca = commit.author().name().unwrap_or("").to_ascii_lowercase();
-            include &= ca.contains(author);
+            let current_author_name = commit.author().name().unwrap_or("").to_ascii_lowercase();
+            let current_author_email = commit.author().email().unwrap_or("").to_ascii_lowercase();
+
+            include &= current_author_name.contains(author) || current_author_email.contains(author);
         }
 
         (include, abort)

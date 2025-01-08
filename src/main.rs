@@ -51,7 +51,7 @@ fn main() -> Result<(), String> {
                 .long("author")
                 .value_name("pattern")
                 .help(
-                    "only include commits where author's name contains <pattern> (case insensitive)",
+                    "only include commits where author's name or email contains <pattern> (case insensitive)",
                 )
                 .takes_value(true),
         )
